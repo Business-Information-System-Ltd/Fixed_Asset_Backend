@@ -1,0 +1,431 @@
+from django.db import models
+from django.core.exceptions import ValidationError
+
+
+
+
+class Company(models.Model):
+    company_id = models.AutoField(primary_key=True)
+    company_code = models.CharField(max_length=255)
+    company_name = models.CharField(max_length=255)
+    branch = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        db_table = 'company'
+
+    def __str__(self):
+        return self.company_name
+
+
+class Department(models.Model):
+    dept_id = models.AutoField(primary_key=True)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, db_column='company_id')
+    dept_code = models.CharField(max_length=255)
+    dept_name = models.CharField(max_length=255)
+
+    class Meta:
+        db_table = 'department'
+
+    def __str__(self):
+        return self.dept_name
+
+
+
+
+class Account(models.Model):
+    account_id = models.AutoField(primary_key=True)
+    account_code = models.CharField(max_length=255)
+    account_name = models.CharField(max_length=255)
+    account_type = models.CharField(max_length=100)
+    currency = models.CharField(max_length=3)
+
+    class Meta:
+        db_table = 'account'
+
+    def __str__(self):
+        return f"{self.account_code} - {self.account_name}"
+
+
+class GeneralLedger(models.Model):
+    SOURCE_TYPES = [
+        ('WIP', 'WIP'),
+        ('FA', 'Fixed Asset'),
+        ('EXPENSE', 'Expense'),
+    ]
+
+    REF_TYPES = [
+        ('Expense', 'Expense'),
+        ('Depreciation', 'Depreciation'),
+    ]
+
+    gl_id = models.AutoField(primary_key=True)
+    source_id = models.IntegerField(null=True, blank=True)
+    account = models.ForeignKey(Account, on_delete=models.CASCADE)
+    gl_code = models.IntegerField()
+    source_type = models.CharField(max_length=20, choices=SOURCE_TYPES)
+    ref_type = models.CharField(max_length=20, choices=REF_TYPES)
+    account_code = models.CharField(max_length=255)
+    gl_date = models.DateField()
+    description = models.CharField(max_length=500, blank=True, null=True)
+    debit_amount = models.FloatField(default=0)
+    credit_amount = models.FloatField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'general_ledger'
+
+   
+
+class GLAllocation(models.Model):
+    ALLOCATION_TYPES = [
+        ('WIP', 'WIP'),
+        ('FA', 'Fixed Asset'),
+        ('EXPENSE', 'Expense'),
+    ]
+
+    STATUS_CHOICES = [
+        ('Pending', 'Pending'),
+        ('Approved', 'Approved'),
+        ('Rejected', 'Rejected'),
+    ]
+
+    gl_allocation_id = models.AutoField(primary_key=True)
+    account = models.ForeignKey(Account, on_delete=models.CASCADE)
+    gl = models.ForeignKey(GeneralLedger, on_delete=models.CASCADE)
+    allocation_type = models.CharField(max_length=20, choices=ALLOCATION_TYPES)
+    allocation_amount = models.FloatField()
+    account_code = models.CharField(max_length=255)
+    reason = models.CharField(max_length=500, blank=True, null=True)
+    approved_by = models.CharField(max_length=255, blank=True, null=True)
+    approved_at = models.DateTimeField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'gl_allocation'
+    
+    def __str__(self):
+        return f"GL Allocation {self.gl_allocation_id}"
+
+
+class WorkInProgress(models.Model):
+    STATUS_CHOICES = [
+        ('progress', 'Progress'),
+        ('completed', 'Completed'),
+        ('capitalized', 'Capitalized'),
+    ]
+
+    wip_id = models.AutoField(primary_key=True)
+    gl_allocation = models.ForeignKey(GLAllocation, on_delete=models.SET_NULL, null=True, blank=True)
+    wip_code = models.CharField(max_length=255)
+    project_name = models.CharField(max_length=255)
+    start_date = models.DateField()
+    end_date = models.DateField(blank=True, null=True)
+    description = models.CharField(max_length=500, blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+    total_amount = models.FloatField()
+    currency = models.CharField(max_length=3)
+
+    class Meta:
+        db_table = 'work_in_progress'
+
+    def __str__(self):
+        return self.wip_code
+
+
+class WIPItem(models.Model):
+    COST_TYPES = [
+        ('cash', 'Cash'),
+        ('bank', 'Bank'),
+    ]
+
+    wip_item_id = models.AutoField(primary_key=True)
+    wip = models.ForeignKey(WorkInProgress, on_delete=models.CASCADE)
+    item_code = models.CharField(max_length=255)
+    item_name = models.CharField(max_length=255)
+    cost_type = models.CharField(max_length=20, choices=COST_TYPES)
+    description = models.CharField(max_length=255, blank=True, null=True)
+    quantity = models.FloatField()
+    unit_cost = models.FloatField()
+    total_cost = models.FloatField()
+    currency = models.CharField(max_length=3)
+    transaction_date = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'wip_item'
+
+    def __str__(self):
+        return self.item_name
+    
+    def save(self, *args, **kwargs):
+        if self.quantity is not None and self.unit_cost is not None :
+            self.total_cost = self.quantity * self.unit_cost
+
+        super().save(*args, **kwargs)
+
+
+class FixedAssetRegister(models.Model):
+    ASSET_STATUS = [
+        ('Finished', 'Finished'),
+        ('Ready to Use', 'Ready to Use'),
+        ('No Depreciation', 'No Depreciation'),
+    ]
+
+    SOURCE_TYPE = [
+        ('WIP', 'WIP'),
+        ('DIRECT', 'Direct'),
+    ]
+
+    ASSET_TYPE = [
+        ('MAIN', 'MAIN'),
+        ('COMPONENT', 'COMPONENT'),
+        
+    ]
+
+    PERIOD = [
+        ('DAY', 'DAY'),
+        ('MONTH', 'MONTH'),
+        ('YEAR', 'YEAR'),
+    ]
+    
+    COMPUTATION = [
+        ('DAY', 'DAY'),
+        ('MONTH', 'MONTH'),
+        ('YEAR', 'YEAR'),
+    ]
+
+    Depreciation_METHOD = [
+        ('Straight Line', 'Straight Line'),
+        ('Reducing Balance', 'Reducing Balance'),
+    ]
+
+    register_id = models.AutoField(primary_key=True)
+    account = models.ForeignKey(Account, on_delete=models.CASCADE)
+    wip = models.ForeignKey(WorkInProgress, on_delete=models.SET_NULL, null=True, blank=True)
+    gl_allocation = models.ForeignKey(GLAllocation, on_delete=models.SET_NULL, null=True, blank=True)
+    fixed_asset_code = models.CharField(max_length=255)
+    acquisition_date = models.DateField()
+    auto_increment = models.BooleanField(default=False)
+    source_type = models.CharField(max_length=20, choices=SOURCE_TYPE)
+    asset_status = models.CharField(max_length=30, choices=ASSET_STATUS)
+    asset_name = models.CharField(max_length=255)
+    asset_model = models.CharField(max_length=255, blank=True, null=True)
+    asset_group = models.CharField(max_length=255, blank=True, null=True)
+    asset_type = models.CharField(max_length=30, choices=ASSET_TYPE)
+    description = models.CharField(max_length=500, blank=True, null=True)
+    useful_life = models.IntegerField()
+    period = models.CharField(max_length=30, choices=PERIOD)
+    capitalization_date = models.DateTimeField()
+    home_currency = models.CharField(max_length=3, default='MMK')
+    transaction_currency = models.CharField(max_length=3)
+    exchange_rate = models.FloatField()
+    acquisition_cost = models.FloatField()
+    home_acquisition_cost = models.FloatField()
+    residual_value = models.FloatField()
+    transportation_fee = models.FloatField()
+    tax = models.FloatField()
+    other_fee = models.FloatField()
+    total_amount = models.FloatField()
+    computation = models.CharField(max_length=30, choices=COMPUTATION)
+    addition_amount = models.FloatField()
+    depreciation_method = models.CharField(max_length=30, choices=Depreciation_METHOD)
+    current_nbv = models.FloatField()
+    depreciation_account = models.CharField(max_length=255)
+    expense_account = models.CharField(max_length=255)
+    supplier = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'fixed_asset_register'
+
+    def __str__(self):
+        return self.fixed_asset_code
+    
+    def clean(self):
+        if self.asset_status in ['Finished', 'Ready to use']:
+            if self.addition_amount and self.addition_amount > 0:
+                raise ValidationError({
+                    'addition_amount':'Addition amount is not allowed when asset status is Finished or Ready to Use.'
+                })
+
+                
+                    
+    
+    def save(self, *args, **kwargs):
+        if self.exchange_rate is not None and self.acquisition_cost is not None:
+            self.home_acquisition_cost = self.exchange_rate * self. acquisition_cost
+
+        self.total_amount = (
+            (self.transportation_fee or 0) +
+            (self.other_fee or 0) +
+            (self.tax or 0) +
+            (self.home_acquisition_cost or 0)
+        )
+        
+        super().save(*args, **kwargs)
+
+
+class Depreciation(models.Model):
+    depreciation_id = models.AutoField(primary_key=True)
+    register = models.ForeignKey(FixedAssetRegister, on_delete=models.CASCADE, db_column='register_id')
+    account = models.ForeignKey(Account, on_delete=models.CASCADE, db_column='account_id')
+    depreciation_date = models.DateField()
+    method = models.CharField(max_length=100)
+    computation = models.CharField(max_length=100)
+    book_value = models.FloatField()
+    depreciation_rate = models.FloatField()
+
+    class Meta:
+        db_table = 'depreciation'
+
+    def __str__(self):
+        return f"Depreciation {self.depreciation_id}"
+
+
+
+class AssetPolicy(models.Model):
+    METHOD_CHOICES = [
+        ('Straight Line', 'Straight Line'),
+        ('Reducing Balance', 'Reducing Balance'),
+    ]
+
+    STATUS_CHOICES = [
+        ('Active', 'Active'),
+        ('Inactive', 'Inactive'),
+    ]
+    policy_id = models.AutoField(primary_key=True)
+    register = models.ForeignKey(FixedAssetRegister, on_delete=models.CASCADE)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE)
+    department = models.ForeignKey(Department, on_delete=models.CASCADE)
+    depreciation = models.ForeignKey(Depreciation, on_delete=models.CASCADE)
+    useful_life = models.IntegerField()
+    status = models.CharField(max_length=20)
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
+    method = models.CharField(
+        max_length=20,
+        choices=METHOD_CHOICES
+    )
+
+    amount = models.FloatField()
+
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES
+    )
+
+    remark = models.CharField(max_length=500, null=True, blank=True)
+
+    class Meta:
+        db_table = 'asset_policy'
+
+    def __str__(self):
+        return f"Policy {self.policy_id}"
+
+
+class DepreciationEvent(models.Model):
+    event_id = models.AutoField(primary_key=True)
+    register = models.ForeignKey(FixedAssetRegister, on_delete=models.CASCADE, db_column='register_id')
+    policy = models.ForeignKey(AssetPolicy, on_delete=models.CASCADE, db_column='policy_id')
+    depreciation = models.ForeignKey(Depreciation, on_delete=models.CASCADE, db_column='depreciation_id')
+    depreciation_date = models.DateField()
+    depreciation_amount = models.FloatField()
+    accumulated_depreciation = models.FloatField()
+    nbv_depreciation = models.FloatField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'depreciation_event'
+
+    def __str__(self):
+        return f"Depreciation Event {self.event_id}"
+
+
+
+
+class AssetDisposal(models.Model):
+    DISPOSAL_TYPE_CHOICES = [
+        ('Sale', 'Sale'),
+        ('Scrap', 'Scrap'),
+        ('WriteOff', 'Write Off'),
+    ]
+
+    COMPUTATION_CHOICES = [
+        ('Gain', 'Gain'),
+        ('Loss', 'Loss'),
+    ]
+    asset_disposal_id = models.AutoField(primary_key=True)
+    register = models.ForeignKey(FixedAssetRegister, on_delete=models.CASCADE,  db_column='register_id')
+    policy = models.ForeignKey(
+        'AssetPolicy',
+        on_delete=models.CASCADE,
+        db_column='policy_id'
+    )
+    disposal_date = models.DateField()
+    disposal_type = models.CharField(
+        max_length=20,
+        choices=DISPOSAL_TYPE_CHOICES
+    )
+    computation = models.CharField(
+        max_length=10,
+        choices=COMPUTATION_CHOICES
+    )
+    proceeds_amount = models.FloatField()
+    book_value = models.FloatField()
+    gain_loss = models.FloatField()
+    remark = models.CharField(max_length=500, null=True, blank=True)
+
+    class Meta:
+        db_table = 'asset_disposal'
+    def __str__(self):
+        return f"Disposal {self.asset_disposal_id}"
+
+
+class AssetAdjustment(models.Model):
+    ADJUSTMENT_TYPE_CHOICES = [
+        ('Additional Cost', 'Additional Cost'),
+        ('Changing Useful life', 'Changing Useful Life'),
+        ('Changing Depreciation Method', 'Changing Depreciation Method'),
+        ('Disposal', 'Disposal'),
+        ('Write Off', 'Write Off'),
+        ('Impairment', 'Impairment'),
+        ('Transfer Location', 'Transfer Location'),
+        ('Partial Disposal', 'Partial Disposal'),
+        ('Component Repalcement', 'Component Replacement'),
+        ('Residual Value Change', 'Residual Value Change'),
+        ('Revaluation', 'Revaluation'),
+        ('Overhaul Cost', 'Overhaul Cost'),
+    ]
+    asset_adjustment_id = models.AutoField(primary_key=True)
+    register = models.ForeignKey(FixedAssetRegister, on_delete=models.CASCADE, db_column='register_id')
+    adjustment_date = models.DateTimeField()
+    adjustment_type = models.CharField(
+        max_length=50,
+        choices=ADJUSTMENT_TYPE_CHOICES
+    )
+
+    old_value = models.FloatField()
+    new_value = models.FloatField()
+    remark = models.CharField(max_length=500, null=True, blank=True)
+
+    class Meta:
+        db_table = 'asset_adjustment'
+
+    def __str__(self):
+        return f"Adjustment {self.asset_adjustment_id}"
+
+
+class AssetDepartmentHistory(models.Model):
+    dept_history_id = models.AutoField(primary_key=True)
+    register = models.ForeignKey(FixedAssetRegister, on_delete=models.CASCADE,  db_column='register_id')
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, db_column='dept_id')
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField(blank=True, null=True)
+    remark = models.CharField(max_length=500, null=True, blank=True)
+
+    class Meta:
+        db_table = 'asset_dept_history'
+
+    def __str__(self):
+        return f"Dept History {self.dept_history_id}"
