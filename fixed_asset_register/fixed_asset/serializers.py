@@ -142,6 +142,7 @@ class FixedAssetRegisterSerializer(serializers.ModelSerializer):
     asset_group = serializers.ReadOnlyField(source='account.account_name')
     home_acquisition_cost = serializers.FloatField(read_only=True)
     total_amount = serializers.FloatField(read_only= True)
+    current_nbv = serializers.FloatField(read_only=True)
     class Meta:
         model = FixedAssetRegister
         fields = '__all__'
@@ -157,6 +158,11 @@ class FixedAssetRegisterSerializer(serializers.ModelSerializer):
         if account:
             instance.asset_group = account.account_name
         return super().update(instance, validated_data)
+    
+class AssetComponentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssetComponent
+        fields = '__all__'
 
 
 class DepreciationSerializer(serializers.ModelSerializer):
@@ -175,6 +181,7 @@ class DepreciationEventSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class AssetDisposalSerializer(serializers.ModelSerializer):
+    gain_loss = serializers.FloatField(read_only=True)
     class Meta:
         model = AssetDisposal
         fields = '__all__'

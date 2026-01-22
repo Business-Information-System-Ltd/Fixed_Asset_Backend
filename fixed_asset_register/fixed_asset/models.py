@@ -1,7 +1,8 @@
 from django.db import models
 from django.core.exceptions import ValidationError
-
-
+from datetime import date, datetime
+from dateutil.relativedelta import relativedelta
+from decimal import Decimal
 
 
 class Company(models.Model):
@@ -243,16 +244,133 @@ class FixedAssetRegister(models.Model):
         return self.fixed_asset_code
     
     def clean(self):
-        if self.asset_status in ['Finished', 'Ready to use']:
-            if self.addition_amount and self.addition_amount > 0:
+        if self.asset_status in ['Finished', 'Ready to use']and self.addition_amount > 0:
                 raise ValidationError({
                     'addition_amount':'Addition amount is not allowed when asset status is Finished or Ready to Use.'
                 })
 
-                
-                    
+
+    def get_total_depreciation_units(self):
+        if self.useful_life <= 0 :
+            return 0
+        
+        if self.period == self.computation:
+            return self.useful_life
+        
+        if self.period == 'YEAR':
+            total_days = self.useful_life *365
+
+        elif self.period == 'MONTH':
+            total_days = self.useful_life * 30
+
+        else:
+            total_days = self.useful_life
+
+        if self.computation == 'YEAR':
+            return total_days // 365
+        
+        elif self.computation == 'MONTH':
+            return total_days // 30
+        else:
+            return total_days
+        
+    def get_elasped_units(self):
+        today = date.today()
+        start_date = self.capitalization_date
+        # start_date = self.capitalization_date.date()
+
+        # if today <= start_date:
+        #     return 0
+        # delta = relativedelta(today, start_date)
+
+
+        # if today <= self.capitalization_date:
+        #     return 0
+        # delta = relativedelta(today, self.capitalization_date)
+
+        if isinstance(start_date, datetime):
+            start_date = start_date.date()
+
+        if today <= start_date:
+            return 0
+
+        delta = relativedelta(today, start_date)
+
+        if self.computation == 'YEAR':
+            return delta.years
+        
+        elif self.computation == 'MONTH':
+            return delta.years * 12 + delta.months
+
+        else:
+            return (today - self.capitalization_date).days
+        
+        
+    
+    def straight_line_accumulated(self):
+        total_units = self.get_total_depreciation_units()
+        if total_units == 0 :
+            return 0
+        elasped_units = min(self.get_elasped_units(), total_units)
+
+        depreciation_amount = self.total_amount - self.residual_value
+        depreciation_per_unit = depreciation_amount / total_units
+
+        return round(depreciation_per_unit * elasped_units, 2)
+    
+    
+    def reducing_balance_accumulated(self):
+        total_units = self.get_total_depreciation_units()
+        if total_units == 0:
+            return 0.0
+
+        elapsed_units = min(self.get_elasped_units(), total_units)
+
+        cost = Decimal(str(self.total_amount))
+        residual = Decimal(str(self.residual_value))
+
+        
+        annual_rate = Decimal("1") / Decimal(str(self.useful_life))
+        computation = self.computation.upper()
+        if computation == "YEAR":
+            period_rate = annual_rate
+        elif computation == "MONTH":
+            period_rate = annual_rate / Decimal("12")
+        elif computation == "DAY":
+            period_rate = annual_rate / Decimal("365")
+        else:
+            period_rate = annual_rate
+        nbv = cost
+
+        for _ in range(int(elapsed_units)):
+            depreciation = nbv * period_rate
+            nbv -= depreciation
+
+            if nbv <= residual:
+                nbv = residual
+                break
+
+        accumulated = cost - nbv
+        return float(accumulated.quantize(Decimal("0.01")))
+    
+    def calculate_current_nbv(self):
+        if self.asset_status == 'No Depreciation':
+            return round(self.total_amount, 2)
+        
+        if self.total_amount <= self.residual_value:
+            return round(self.residual_value, 2)
+        
+        if self.depreciation_method == 'Straight Line':
+            accumulated = self.straight_line_accumulated()
+        else:
+            accumulated = self.reducing_balance_accumulated()
+
+        nbv = self.total_amount - accumulated
+        return round(max(nbv, self.residual_value), 2)
     
     def save(self, *args, **kwargs):
+        # self.full_clean()
+
         if self.exchange_rate is not None and self.acquisition_cost is not None:
             self.home_acquisition_cost = self.exchange_rate * self. acquisition_cost
 
@@ -263,7 +381,59 @@ class FixedAssetRegister(models.Model):
             (self.home_acquisition_cost or 0)
         )
         
+        if self.depreciation_method == 'Reducing Balance':
+            self.current_nbv = self.calculate_current_nbv()
+        elif self.depreciation_method == 'Straight Line':
+            self.current_nbv = self.calculate_current_nbv() 
         super().save(*args, **kwargs)
+
+
+
+
+class AssetComponent(models.Model):
+
+    PERIOD_CHOICES = [
+        ('Day', 'Day'),
+        ('Month', 'Month'),
+        ('Year', 'Year'),
+    ]
+
+    component_id = models.AutoField(primary_key=True)
+    register = models.ForeignKey(
+        'FixedAssetRegister',
+        on_delete=models.CASCADE,
+        related_name='asset_components'
+    )
+
+    component_type = models.CharField(max_length=100)
+
+    install_date = models.DateTimeField(null=True, blank=True)
+    uninstall_date = models.DateTimeField(null=True, blank=True)
+    capitalization_date = models.DateTimeField(null=True, blank=True)
+
+    remark = models.CharField(max_length=255, null=True, blank=True)
+
+    cost = models.FloatField(default=0)
+    currency = models.CharField(max_length=3, default='MMK')
+
+    useful_life = models.IntegerField(
+        help_text="Useful life value based on selected period"
+    )
+
+    period = models.CharField(
+        max_length=10,
+        choices=PERIOD_CHOICES
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+
+    class Meta:
+        db_table = 'asset_component'
+        ordering = ['component_id']
+
+    def __str__(self):
+        return f"{self.component_type} (Asset ID: {self.register_id})"
 
 
 class Depreciation(models.Model):
@@ -274,6 +444,7 @@ class Depreciation(models.Model):
     method = models.CharField(max_length=100)
     computation = models.CharField(max_length=100)
     book_value = models.FloatField()
+    journal = models.CharField(max_length=255)
     depreciation_rate = models.FloatField()
 
     class Meta:
@@ -285,6 +456,11 @@ class Depreciation(models.Model):
 
 
 class AssetPolicy(models.Model):
+    PERIOD = [
+        ('DAY', 'DAY'),
+        ('MONTH', 'MONTH'),
+        ('YEAR', 'YEAR'),
+    ]
     METHOD_CHOICES = [
         ('Straight Line', 'Straight Line'),
         ('Reducing Balance', 'Reducing Balance'),
@@ -300,6 +476,7 @@ class AssetPolicy(models.Model):
     department = models.ForeignKey(Department, on_delete=models.CASCADE)
     depreciation = models.ForeignKey(Depreciation, on_delete=models.CASCADE)
     useful_life = models.IntegerField()
+    period = models.CharField(max_length=5, choices=PERIOD)
     status = models.CharField(max_length=20)
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
@@ -378,8 +555,15 @@ class AssetDisposal(models.Model):
 
     class Meta:
         db_table = 'asset_disposal'
+
     def __str__(self):
         return f"Disposal {self.asset_disposal_id}"
+    
+    def save(self, *args, **kwargs):
+        if self.proceeds_amount is not None and self.book_value is not None:
+            self.gain_loss = self.proceeds_amount - self.book_value
+
+        super().save(*args, **kwargs)
 
 
 class AssetAdjustment(models.Model):
@@ -429,3 +613,6 @@ class AssetDepartmentHistory(models.Model):
 
     def __str__(self):
         return f"Dept History {self.dept_history_id}"
+    
+
+

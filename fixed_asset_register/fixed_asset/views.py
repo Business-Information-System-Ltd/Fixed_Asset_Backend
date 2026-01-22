@@ -35,6 +35,10 @@ class FixedAssetRegisterViewSet(viewsets.ModelViewSet):
     queryset = FixedAssetRegister.objects.all()
     serializer_class = FixedAssetRegisterSerializer
 
+class AssetComponentViewSet(viewsets.ModelViewSet):
+    queryset = AssetComponent.objects.all()
+    serializer_class = AssetComponentSerializer
+
 class DepreciationViewSet(viewsets.ModelViewSet):
     queryset = Depreciation.objects.all()
     serializer_class = DepreciationSerializer
