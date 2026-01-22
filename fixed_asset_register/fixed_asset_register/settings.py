@@ -10,7 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
-import pymysql
+import pymysql, os
 pymysql.install_as_MySQLdb()
 
 
@@ -29,7 +29,11 @@ SECRET_KEY = 'django-insecure-#3g7&7kn^no&2j0q-#pgqzcqw^@la$=r@go*-=u%89p+%xpa)%
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "fixedassetbackend-dchggqcdd7gefsb5.canadacentral-01.azurewebsites.net",
+    "localhost"
+    ]
 
 
 # Application definition
@@ -42,7 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    # 'corsheaders',
+    'corsheaders',
     'django_extensions',
     'fixed_asset',
 ]
@@ -56,7 +60,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # 'whitenoise.middleware.WhiteNoiseMiddleware'
+    'whitenoise.middleware.WhiteNoiseMiddleware'
 ]
 
 ROOT_URLCONF = 'fixed_asset_register.urls'
@@ -132,3 +136,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "https://gentle-moss-03b9b8b0f.4.azurestaticapps.net",
+]
