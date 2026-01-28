@@ -31,7 +31,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          cd project_backend
+          cd fixed_asset_register
           pip install -r requirements.txt
 
       # 🛠️ Local Build Section (Optional)
@@ -91,3 +91,4 @@ jobs:
           slot-name: 'Production'
 
           
+
