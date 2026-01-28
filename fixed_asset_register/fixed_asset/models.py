@@ -207,7 +207,7 @@ class FixedAssetRegister(models.Model):
     gl_allocation = models.ForeignKey(GLAllocation, on_delete=models.SET_NULL, null=True, blank=True)
     fixed_asset_code = models.CharField(max_length=255)
     acquisition_date = models.DateField()
-    auto_increment = models.BooleanField(default=False)
+    # auto_increment = models.BooleanField(default=False)
     source_type = models.CharField(max_length=20, choices=SOURCE_TYPE)
     asset_status = models.CharField(max_length=30, choices=ASSET_STATUS)
     asset_name = models.CharField(max_length=255)
