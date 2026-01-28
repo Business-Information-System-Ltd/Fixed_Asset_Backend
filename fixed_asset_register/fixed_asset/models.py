@@ -171,6 +171,16 @@ class FixedAssetRegister(models.Model):
         ('Finished', 'Finished'),
         ('Ready to Use', 'Ready to Use'),
         ('No Depreciation', 'No Depreciation'),
+        ('Disposal', 'Disposal'),
+    ]
+
+    CURRENCY_TYPE = [
+        ('MMK', 'MMK'),
+        ('USD', 'USD'),
+        ('CNY', 'CNY'),
+        ('THB', 'THB'),
+        ('JPY', 'JPY'),
+        ('SGD', 'SGD'),
     ]
 
     SOURCE_TYPE = [
@@ -199,6 +209,7 @@ class FixedAssetRegister(models.Model):
     Depreciation_METHOD = [
         ('Straight Line', 'Straight Line'),
         ('Reducing Balance', 'Reducing Balance'),
+        ('Double Declining', 'Double Declining'),
     ]
 
     register_id = models.AutoField(primary_key=True)
@@ -206,8 +217,8 @@ class FixedAssetRegister(models.Model):
     wip = models.ForeignKey(WorkInProgress, on_delete=models.SET_NULL, null=True, blank=True)
     gl_allocation = models.ForeignKey(GLAllocation, on_delete=models.SET_NULL, null=True, blank=True)
     fixed_asset_code = models.CharField(max_length=255)
+    fixed_asset_account = models.CharField(max_length=255)
     acquisition_date = models.DateField()
-    auto_increment = models.BooleanField(default=False)
     source_type = models.CharField(max_length=20, choices=SOURCE_TYPE)
     asset_status = models.CharField(max_length=30, choices=ASSET_STATUS)
     asset_name = models.CharField(max_length=255)
@@ -217,19 +228,25 @@ class FixedAssetRegister(models.Model):
     description = models.CharField(max_length=500, blank=True, null=True)
     useful_life = models.IntegerField()
     period = models.CharField(max_length=30, choices=PERIOD)
-    capitalization_date = models.DateTimeField()
+    capitalization_date = models.DateTimeField(null=False, blank=False)
     home_currency = models.CharField(max_length=3, default='MMK')
-    transaction_currency = models.CharField(max_length=3)
+    transaction_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE)
     exchange_rate = models.FloatField()
     acquisition_cost = models.FloatField()
     home_acquisition_cost = models.FloatField()
     residual_value = models.FloatField()
+    residual_currency = models.CharField(max_length=3,  choices=CURRENCY_TYPE)
     transportation_fee = models.FloatField()
+    transportation_currency = models.CharField(max_length=3,  choices=CURRENCY_TYPE)
     tax = models.FloatField()
+    tax_fee_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE)
     other_fee = models.FloatField()
+    other_fee_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE)
     total_amount = models.FloatField()
+    total_amount_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE)
     computation = models.CharField(max_length=30, choices=COMPUTATION)
     addition_amount = models.FloatField()
+    additional_amount_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE)
     depreciation_method = models.CharField(max_length=30, choices=Depreciation_METHOD)
     current_nbv = models.FloatField()
     depreciation_account = models.CharField(max_length=255)
@@ -275,18 +292,10 @@ class FixedAssetRegister(models.Model):
             return total_days
         
     def get_elasped_units(self):
+        if not self.capitalization_date:
+            return 0
         today = date.today()
         start_date = self.capitalization_date
-        # start_date = self.capitalization_date.date()
-
-        # if today <= start_date:
-        #     return 0
-        # delta = relativedelta(today, start_date)
-
-
-        # if today <= self.capitalization_date:
-        #     return 0
-        # delta = relativedelta(today, self.capitalization_date)
 
         if isinstance(start_date, datetime):
             start_date = start_date.date()
@@ -303,7 +312,7 @@ class FixedAssetRegister(models.Model):
             return delta.years * 12 + delta.months
 
         else:
-            return (today - self.capitalization_date).days
+            return (today - start_date).days
         
         
     
@@ -353,6 +362,39 @@ class FixedAssetRegister(models.Model):
         accumulated = cost - nbv
         return float(accumulated.quantize(Decimal("0.01")))
     
+    def double_declining_accumulated(self):
+        total_units = self.get_total_depreciation_units()
+        if total_units == 0:
+            return 0.0
+
+        elapsed_units = min(self.get_elasped_units(), total_units)
+
+        cost = Decimal(str(self.total_amount))
+        residual = Decimal(str(self.residual_value))
+
+        annual_rate = Decimal("2") / Decimal(str(self.useful_life))
+        computation = self.computation.upper()
+        if computation == "YEAR":
+            period_rate = annual_rate
+        elif computation == "MONTH":
+            period_rate = annual_rate / Decimal("12")
+        elif computation == "DAY":
+            period_rate = annual_rate / Decimal("365")
+        else:
+            period_rate = annual_rate
+        nbv = cost
+
+        for _ in range(int(elapsed_units)):
+            depreciation = nbv * period_rate
+            nbv -= depreciation
+
+            if nbv <= residual:
+                nbv = residual
+                break
+
+        accumulated = cost - nbv
+        return float(accumulated.quantize(Decimal("0.01")))
+
     def calculate_current_nbv(self):
         if self.asset_status == 'No Depreciation':
             return round(self.total_amount, 2)
@@ -362,6 +404,10 @@ class FixedAssetRegister(models.Model):
         
         if self.depreciation_method == 'Straight Line':
             accumulated = self.straight_line_accumulated()
+
+        elif self.depreciation_method == 'Double Declining':
+            accumulated = self.double_declining_accumulated()
+
         else:
             accumulated = self.reducing_balance_accumulated()
 
@@ -382,6 +428,8 @@ class FixedAssetRegister(models.Model):
         )
         
         if self.depreciation_method == 'Reducing Balance':
+            self.current_nbv = self.calculate_current_nbv()
+        elif self.depreciation_method == 'Double Declining':
             self.current_nbv = self.calculate_current_nbv()
         elif self.depreciation_method == 'Straight Line':
             self.current_nbv = self.calculate_current_nbv() 
