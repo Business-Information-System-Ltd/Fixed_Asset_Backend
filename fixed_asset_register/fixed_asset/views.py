@@ -6,6 +6,7 @@ from .serializers import *
 class CompanyViewSet(viewsets.ModelViewSet):
     queryset = Company.objects.all()
     serializer_class = CompanySerializer
+    
 
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()

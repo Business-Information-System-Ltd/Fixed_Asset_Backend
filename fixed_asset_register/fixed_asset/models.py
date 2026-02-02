@@ -16,7 +16,7 @@ class Company(models.Model):
 
     def __str__(self):
         return self.company_name
-
+    
 
 class Department(models.Model):
     dept_id = models.AutoField(primary_key=True)

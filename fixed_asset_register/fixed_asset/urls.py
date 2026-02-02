@@ -1,3 +1,4 @@
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import *
 
@@ -18,4 +19,6 @@ router.register(r'asset-disposals', AssetDisposalViewSet)
 router.register(r'asset-adjustments', AssetAdjustmentViewSet)
 router.register(r'asset-dept-histories', AssetDepartmentHistoryViewSet)
 
-urlpatterns = router.urls
+urlpatterns = [
+    path('', include(router.urls)),
+]
