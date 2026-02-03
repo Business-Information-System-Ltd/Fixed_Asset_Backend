@@ -300,7 +300,7 @@ class FixedAssetRegister(models.Model):
         if isinstance(start_date, datetime):
             start_date = start_date.date()
 
-        if today <= start_date:
+        if today < start_date:
             return 0
 
         delta = relativedelta(today, start_date)
@@ -327,73 +327,62 @@ class FixedAssetRegister(models.Model):
 
         return round(depreciation_per_unit * elasped_units, 2)
     
+    def reducing_balance(total_amount, residual_value, useful_life, elapsed_units, computation):
     
-    def reducing_balance_accumulated(self):
-        total_units = self.get_total_depreciation_units()
-        if total_units == 0:
-            return 0.0
+        cost = Decimal(str(total_amount))
+        residual = Decimal(str(residual_value))
 
-        elapsed_units = min(self.get_elasped_units(), total_units)
-
-        cost = Decimal(str(self.total_amount))
-        residual = Decimal(str(self.residual_value))
+        if useful_life <= 0 or elapsed_units <= 0:
+            return Decimal("0.00")
 
         
-        annual_rate = Decimal("1") / Decimal(str(self.useful_life))
-        computation = self.computation.upper()
-        if computation == "YEAR":
-            period_rate = annual_rate
-        elif computation == "MONTH":
-            period_rate = annual_rate / Decimal("12")
-        elif computation == "DAY":
-            period_rate = annual_rate / Decimal("365")
-        else:
-            period_rate = annual_rate
+        rate = Decimal("1") - (residual / cost) ** (Decimal("1") / Decimal(str(useful_life)))
+
+        
+        period = computation.upper()
+        if period == "MONTH":
+            rate = rate / Decimal("12")
+        elif period == "DAY":
+            rate = rate / Decimal("365")
+        
+
         nbv = cost
-
         for _ in range(int(elapsed_units)):
-            depreciation = nbv * period_rate
+            depreciation = nbv * rate
             nbv -= depreciation
-
-            if nbv <= residual:
+            if nbv < residual:
                 nbv = residual
                 break
 
         accumulated = cost - nbv
         return float(accumulated.quantize(Decimal("0.01")))
-    
-    def double_declining_accumulated(self):
-        total_units = self.get_total_depreciation_units()
-        if total_units == 0:
-            return 0.0
 
-        elapsed_units = min(self.get_elasped_units(), total_units)
 
-        cost = Decimal(str(self.total_amount))
-        residual = Decimal(str(self.residual_value))
+    def double_declining(total_amount, residual_value, useful_life, elapsed_units, computation):
+        cost = Decimal(str(total_amount))
+        residual = Decimal(str(residual_value))
 
-        annual_rate = Decimal("2") / Decimal(str(self.useful_life))
-        computation = self.computation.upper()
-        if computation == "YEAR":
-            period_rate = annual_rate
-        elif computation == "MONTH":
-            period_rate = annual_rate / Decimal("12")
-        elif computation == "DAY":
-            period_rate = annual_rate / Decimal("365")
+        annual_rate = Decimal("2") / Decimal(str(useful_life))
+
+        period = computation.upper()
+        if period == "MONTH":
+            rate = annual_rate / Decimal("12")
+        elif period == "DAY":
+            rate = annual_rate / Decimal("365")
         else:
-            period_rate = annual_rate
+            rate = annual_rate
+
         nbv = cost
-
         for _ in range(int(elapsed_units)):
-            depreciation = nbv * period_rate
+            depreciation = nbv * rate
             nbv -= depreciation
-
             if nbv <= residual:
                 nbv = residual
                 break
 
-        accumulated = cost - nbv
-        return float(accumulated.quantize(Decimal("0.01")))
+        return cost - nbv
+
+
 
     def calculate_current_nbv(self):
         if self.asset_status == 'No Depreciation':

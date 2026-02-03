@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import *
+from .views import DepreciationCalculationAPI
 
 router = DefaultRouter()
 router.register(r'companies', CompanyViewSet)
@@ -20,5 +21,6 @@ router.register(r'asset-adjustments', AssetAdjustmentViewSet)
 router.register(r'asset-dept-histories', AssetDepartmentHistoryViewSet)
 
 urlpatterns = [
+    path('depreciation/calculate/', DepreciationCalculationAPI.as_view(), name='depreciation-calculation'),
     path('', include(router.urls)),
 ]
