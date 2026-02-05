@@ -195,3 +195,28 @@ class AssetDepartmentHistorySerializer(serializers.ModelSerializer):
     class Meta:
         model = AssetDepartmentHistory
         fields = '__all__'
+
+class FixedAssetFullSerializer (serializers.ModelSerializer):
+    asset_components = AssetComponentSerializer(many=True, read_only=True)
+    depreciations = DepreciationSerializer(
+        source='depreciation_set', many=True, read_only=True
+    )
+    depreciation_events = DepreciationEventSerializer(
+        source='depreciation_event_set', many=True, read_only=True
+    )
+    asset_policies = AssetPolicySerializer(
+        source='assetpolicy_set', many = True, read_only=True
+    )
+    asset_disposals = AssetDisposalSerializer(
+        source='assetdisposal_set', many=True, read_only=True
+    )
+    asset_adjustments = AssetAdjustmentSerializer(
+        source='assetadjustment_set', many=True, read_only=True
+    )
+    asset_dept_histories = AssetDepartmentHistorySerializer(
+        source='assetdepartmenthistory_set', many=True, read_only=True
+    )
+
+    class Meta:
+        model = FixedAssetRegister
+        fields = '__all__'

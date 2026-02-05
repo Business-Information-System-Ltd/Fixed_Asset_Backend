@@ -511,7 +511,7 @@ class AssetPolicy(models.Model):
     register = models.ForeignKey(FixedAssetRegister, on_delete=models.CASCADE)
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
     department = models.ForeignKey(Department, on_delete=models.CASCADE)
-    depreciation = models.ForeignKey(Depreciation, on_delete=models.CASCADE)
+    depreciation = models.ForeignKey(Depreciation, on_delete=models.CASCADE, db_column='depreciation_id')
     useful_life = models.IntegerField()
     period = models.CharField(max_length=5, choices=PERIOD)
     status = models.CharField(max_length=20)

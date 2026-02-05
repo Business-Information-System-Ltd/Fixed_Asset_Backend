@@ -22,5 +22,31 @@ router.register(r'asset-dept-histories', AssetDepartmentHistoryViewSet)
 
 urlpatterns = [
     path('depreciation/calculate/', DepreciationCalculationAPI.as_view(), name='depreciation-calculation'),
+    path('fixed-assets/<int:pk>/full-detail/', FixedAssetFullDetailAPI.as_view(), name='fixed-asset-full-detail'),
+    path('wips/<int:pk>/items/', WIPItemsAPI.as_view()),
+    path('wips/<int:pk>/fixed-assets/', WIPFixedAssetAPI.as_view()),
+    path('gl-allocations/<int:pk>/wips/', GLAllocationWIPAPI.as_view()),
+    path('general-ledgers/<int:pk>/gl-allocations/', GLAllocationsByGLAPI.as_view()),
+    path('companies/<int:pk>/departments/', CompanyDepartmentsAPI.as_view()),
+    path('companies/<int:pk>/asset-policies/', CompanyAssetPolicyAPI.as_view()),
+    path('departments/<int:pk>/asset-dept-histories/', DepartmentAssetDeptHistoryAPI.as_view()),
+    path('departments/<int:pk>/asset-policies/',DepartmentAssetPolicyAPI.as_view()),
+    path('accounts/<int:pk>/fixed-assets/',AccountFixedAssetAPI.as_view()),
+    path('accounts/<int:pk>/depreciations/',AccountDepreciationAPI.as_view()),
+    path('accounts/<int:pk>/general-ledgers/',AccountGeneralLedgerAPI.as_view()),
+    path('asset-policies/<int:pk>/disposals/',AssetPolicyDisposalAPI.as_view()),
+    path('asset-policies/<int:pk>/depreciation-events/',AssetPolicyDepreciationEventAPI.as_view()),
+    path('asset-policies/<int:pk>/disposals/',AssetPolicyDisposalAPI.as_view()),
+    path('depreciations/<int:pk>/depreciation-events/',DepreciationDepreEventAPI.as_view()),
+    path('depreciations/<int:pk>/asset-policies/',DepreciationAssetPolicyAPI.as_view()),
+    path('fixed-assets/<int:pk>/depreciation-events/',FixedAssetDepreciationEventAPI.as_view()),
+    path('fixed-assets/<int:pk>/depreciations/',FixedAssetDepreciationAPI.as_view()),
+    path('fixed-assets/<int:pk>/asset-policies/',FixedAssetPolicyAPI.as_view()),
+    path('fixed-assets/<int:pk>/asset-adjustments/',FixedAssetAdjustmentAPI.as_view()),
+    path('fixed-assets/<int:pk>/dept-histories/',FixedAssetDeptHistoryAPI.as_view()),
+    path('fixed-assets/<int:pk>/asset-disposals/',FixedAssetDisposalAPI.as_view()),
+    path('fixed-assets/<int:pk>/asset-components/',FixedAssetComponentAPI.as_view()),
+
     path('', include(router.urls)),
+    
 ]

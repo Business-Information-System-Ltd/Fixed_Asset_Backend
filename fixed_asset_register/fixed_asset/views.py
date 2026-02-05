@@ -6,6 +6,7 @@ from rest_framework import viewsets
 from rest_framework import status
 from .models import *
 from .serializers import *
+from django.shortcuts import get_object_or_404
 import traceback
 from .services.depreciation import (
     get_total_units,
@@ -118,4 +119,157 @@ class DepreciationCalculationAPI(APIView):
 
     def get(self, request):
         return Response({"detail": "Use POST to calculate depreciation"}, status=200)
-        
+
+class FixedAssetFullDetailAPI(APIView):
+    def get(self, request, pk):
+        asset = get_object_or_404(
+            FixedAssetRegister.objects.prefetch_related(
+                'asset_components',
+                'depreciation_set',
+                'depreciationevent_set',
+                'assetdisposal_set',
+                'assetadjustment_set',
+                'assetdepartmenthistory_set'
+
+            ),
+            pk=pk
+        )  
+
+        serializer = FixedAssetFullSerializer(asset)
+        return Response(serializer.data, status=status.HTTP_200_OK)  
+
+
+class WIPItemsAPI(APIView):
+    def get(self, request, pk):
+        wip_items = WIPItem.objects.filter(wip_id =pk)
+        serializer = WIPItemSerializer(wip_items, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class WIPFixedAssetAPI(APIView):
+    def get(self, request, pk):
+        wip = get_object_or_404(WorkInProgress, pk=pk)
+        fixed_assets = FixedAssetRegister.objects.filter(wip_id = pk)
+        serializer = FixedAssetRegisterSerializer(fixed_assets, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class GLAllocationsByGLAPI(APIView):
+    def get(self, request, pk):
+        gl_allocations = GLAllocation.objects.filter(gl_id=pk)
+        serializer = GLAllocationSerializer(gl_allocations, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class GLAllocationWIPAPI(APIView):
+    def get(self, request, pk):
+        gl_allocation = get_object_or_404(GLAllocation, pk=pk)
+        wips = WorkInProgress.objects.filter(gl_allocation_id=pk)
+        serializer = WorkInProgressSerializer(wips, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+   
+class CompanyDepartmentsAPI(APIView):
+    def get(self, request, pk):
+        departments = Department.objects.filter(company_id=pk)
+        serializer = DepartmentSerializer(departments, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class CompanyAssetPolicyAPI(APIView):
+    def get(self, request, pk):
+        asset_policies = AssetPolicy.objects.filter(company_id=pk)
+        serializer = AssetPolicySerializer(asset_policies, many =True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class DepartmentAssetDeptHistoryAPI(APIView):
+    def get(self,request, pk):
+        asset_dept_history = AssetDepartmentHistory.objects.filter(department_id =pk)
+        serializer = AssetDepartmentHistorySerializer(asset_dept_history, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class DepartmentAssetPolicyAPI(APIView):
+    def get(self, request, pk):
+        asset_policies = AssetPolicy.objects.filter(department_id=pk)
+        serializer = AssetPolicySerializer(asset_policies, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class AccountFixedAssetAPI(APIView):
+    def get(self, reauest, pk):
+        fixed_assets = FixedAssetRegister.objects.filter(account_id=pk)
+        serializer =  FixedAssetRegisterSerializer(fixed_assets, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class AccountDepreciationAPI(APIView):
+    def get(self, request,pk):
+        depreciations = Depreciation.objects.filter(account_id=pk)
+        serializer = DepreciationSerializer(depreciations, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class AccountGeneralLedgerAPI(APIView):
+    def get(self, request, pk):
+        general_ledgers = GeneralLedger.objects.filter(account_id=pk)
+        serializer = GeneralLedgerSerializer(general_ledgers, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)   
+
+class AssetPolicyDisposalAPI(APIView):
+    def get(self, request, pk):
+        asset_disposals = AssetDisposal.objects.filter(policy_id=pk)
+        serializer = AssetDisposalSerializer(asset_disposals, many=True)
+        return Response (serializer.data, status = status.HTTP_200_OK)
+    
+class AssetPolicyDepreciationEventAPI(APIView):
+    def get(self, request, pk):
+        depreciation_events = DepreciationEvent.objects.filter(policy_id=pk)
+        serializer = DepreciationEventSerializer(depreciation_events, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class DepreciationDepreEventAPI(APIView):
+    def get(self, request, pk):
+        depreciation_events = DepreciationEvent.objects.filter(depreciation_id=pk)
+        serializer = DepreciationEventSerializer(depreciation_events, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class DepreciationAssetPolicyAPI(APIView):
+    def get(self, request, pk):
+        asset_policies = AssetPolicy.objects.filter(depreciation_id=pk)
+        serializer = AssetPolicySerializer(asset_policies, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class FixedAssetDepreciationEventAPI(APIView):
+    def get(self, request, pk):
+        depreciation_events = DepreciationEvent.objects.filter(register_id=pk)
+        serializer = DepreciationEventSerializer(depreciation_events, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class FixedAssetDepreciationAPI(APIView):
+    def get(self, request, pk):
+        depreciations = Depreciation.objects.filter(register_id=pk)
+        serializer = DepreciationSerializer(depreciations, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class FixedAssetPolicyAPI(APIView):
+    def get(self, request, pk):
+        asset_policies = AssetPolicy.objects.filter(register_id=pk)
+        serializer = AssetPolicySerializer(asset_policies, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class FixedAssetAdjustmentAPI(APIView):
+    def get(self, request, pk):
+        asset_adjustments = AssetAdjustment.objects.filter(register_id=pk)
+        serializer = AssetAdjustmentSerializer(asset_adjustments, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class FixedAssetDeptHistoryAPI(APIView):
+    def get(self, request, pk):
+        asset_dept_histories = AssetDepartmentHistory.objects.filter(register_id=pk)
+        serializer = AssetDepartmentHistorySerializer(asset_dept_histories, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class FixedAssetDisposalAPI(APIView):
+    def get(self, request, pk):
+        asset_disposals = AssetDisposal.objects.filter(register_id=pk)
+        serializer = AssetDisposalSerializer(asset_disposals, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class FixedAssetComponentAPI(APIView):
+    def get(self, request, pk):
+        asset_components = AssetComponent.objects.filter(register_id=pk)
+        serializer = AssetComponentSerializer(asset_components, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
