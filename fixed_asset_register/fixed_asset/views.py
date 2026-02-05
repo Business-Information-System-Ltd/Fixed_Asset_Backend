@@ -1,5 +1,7 @@
 from django.shortcuts import render
 from datetime import datetime
+from django.utils import timezone
+from datetime import datetime, timedelta
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import viewsets
@@ -8,6 +10,7 @@ from .models import *
 from .serializers import *
 from django.shortcuts import get_object_or_404
 import traceback
+from rest_framework.permissions import AllowAny
 from .services.depreciation import (
     get_total_units,
     get_elapsed_units,
@@ -136,8 +139,99 @@ class FixedAssetFullDetailAPI(APIView):
         )  
 
         serializer = FixedAssetFullSerializer(asset)
-        return Response(serializer.data, status=status.HTTP_200_OK)  
+        return Response(serializer.data, status=status.HTTP_200_OK) 
 
+
+class ExecuteDepreciationAPI(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+        try:
+            data = request.data
+            asset_id = data.get('fixed_asset_id')
+            calculation_result = data.get('calculation_result', {})
+            show_in_journal = data.get('show_in_journal', False)
+            
+            if not asset_id:
+                return Response({'error': 'Asset ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            asset = FixedAssetRegister.objects.get(pk=asset_id)
+            
+            
+            if asset.asset_status.lower() != 'ready to use':
+                return Response({
+                    'error': f'Asset status must be "Ready to Use". Current status: {asset.asset_status}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get or create account
+            try:
+                account = Account.objects.get(account_name=asset.fixed_asset_account)
+            except Account.DoesNotExist:
+                account = Account.objects.create(
+                    account_name=asset.fixed_asset_account,
+                    account_type='Asset'
+                )
+            
+            # Create Depreciation record
+            depreciation = Depreciation.objects.create(
+                register=asset,
+                account=account,
+                depreciation_date=timezone.now().date(),
+                method=asset.depreciation_method,
+                computation=asset.computation,
+                book_value=calculation_result.get('current_nbv', asset.current_nbv),
+                journal='Depreciation Journal Entry' if show_in_journal else '',
+                depreciation_rate=0.0,  
+            )
+            
+            #  Get or create AssetPolicy
+            policy, created = AssetPolicy.objects.get_or_create(
+                register=asset,
+                defaults={
+                    'useful_life': asset.useful_life,
+                    'period': asset.period,
+                    'start_date': asset.capitalization_date,
+                    'end_date': asset.capitalization_date + timedelta(days=asset.useful_life * 365),
+                    'method': asset.depreciation_method,
+                    'amount': calculation_result.get('depreciation_amount', 0),
+                    'status': 'Active',
+                    'remark': f'Auto-generated policy for {asset.fixed_asset_code}',
+                }
+            )
+            
+            #  Create DepreciationEvent
+            depreciation_event = DepreciationEvent.objects.create(
+                register=asset,
+                policy=policy,
+                depreciation=depreciation,
+                depreciation_date=timezone.now().date(),
+                depreciation_amount=calculation_result.get('depreciation_amount', 0),
+                accumulated_depreciation=calculation_result.get('accumulated_depreciation', 0),
+                nbv_depreciation=calculation_result.get('current_nbv', asset.current_nbv),
+            )
+            
+          
+            asset.current_nbv = calculation_result.get('current_nbv', asset.current_nbv)
+            
+            # Check if asset is fully depreciated
+            if asset.current_nbv <= asset.residual_value:
+                asset.asset_status = 'Finished'
+            
+            asset.save()
+            
+            return Response({
+                'success': True,
+                'message': 'Depreciation executed successfully',
+                'depreciation_id': depreciation.depreciation_id,
+                'event_id': depreciation_event.event_id,
+                'policy_id': policy.policy_id,
+                'new_nbv': asset.current_nbv,
+            }, status=status.HTTP_201_CREATED)
+            
+        except FixedAssetRegister.DoesNotExist:
+            return Response({'error': 'Asset not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e), 'traceback': traceback.format_exc()}, 
+                          status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class WIPItemsAPI(APIView):
     def get(self, request, pk):

@@ -22,6 +22,7 @@ router.register(r'asset-dept-histories', AssetDepartmentHistoryViewSet)
 
 urlpatterns = [
     path('depreciation/calculate/', DepreciationCalculationAPI.as_view(), name='depreciation-calculation'),
+    path('execute-depreciation/', ExecuteDepreciationAPI.as_view(), name='execute-depreciation'),
     path('fixed-assets/<int:pk>/full-detail/', FixedAssetFullDetailAPI.as_view(), name='fixed-asset-full-detail'),
     path('wips/<int:pk>/items/', WIPItemsAPI.as_view()),
     path('wips/<int:pk>/fixed-assets/', WIPFixedAssetAPI.as_view()),
