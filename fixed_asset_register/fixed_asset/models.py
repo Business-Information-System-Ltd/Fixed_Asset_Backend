@@ -652,4 +652,31 @@ class AssetDepartmentHistory(models.Model):
         return f"Dept History {self.dept_history_id}"
     
 
+class Role(models.Model):
+    role_id = models.AutoField(primary_key=True)
+    role_name = models.CharField(max_length=50, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        db_table = 'roles'
+
+class Users(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=100)
+    email = models.EmailField(max_length=150, unique=True)
+    phone_number = models.CharField(max_length=20, null=True, blank=True)
+    department = models.ForeignKey(Department, on_delete=models.CASCADE)
+    role = models.ForeignKey(Role, on_delete=models.CASCADE)
+    password_hash = models.TextField(null=True, blank=True)
+    auth_provider = models.CharField(
+        max_length=20, 
+        choices=[('local', 'local'), ('google', 'google'), ('microsoft', 'microsoft')],
+        default='local'
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'users'
+    
+
 

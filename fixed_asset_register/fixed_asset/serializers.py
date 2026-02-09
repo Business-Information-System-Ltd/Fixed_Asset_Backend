@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import *
+from django.contrib.auth.hashers import make_password
 
 class CompanySerializer(serializers.ModelSerializer):
     class Meta:
@@ -220,3 +221,14 @@ class FixedAssetFullSerializer (serializers.ModelSerializer):
     class Meta:
         model = FixedAssetRegister
         fields = '__all__'
+
+class UserSignupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Users
+        fields = ['name', 'email', 'phone_number', 'department', 'role', 'password_hash', 'auth_provider']
+
+    def create(self, validated_data):
+        
+        if validated_data.get('password_hash'):
+            validated_data['password_hash'] = make_password(validated_data['password_hash'])
+        return super().create(validated_data)
