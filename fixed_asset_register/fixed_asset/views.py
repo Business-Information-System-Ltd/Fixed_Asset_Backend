@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework import viewsets
 from rest_framework import status
 from .models import *
+from django.contrib.auth.hashers import check_password
 from .serializers import *
 from django.shortcuts import get_object_or_404
 import traceback
@@ -381,3 +382,29 @@ class SignupView(APIView):
             serializer.save()
             return Response({"message": "User registered successfully!"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+class LoginView(APIView):
+    def post(self, request):
+        email = request.data.get('email')
+        password = request.data.get('password')
+
+        try:
+            
+            user = Users.objects.get(email=email)
+            
+            
+            if check_password(password, user.password_hash):
+                return Response({
+                    "message": "Login Successful",
+                    "user": {
+                        "id": user.id,
+                        "name": user.name,
+                        "role": user.role.role_name
+                    }
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Invalid Password"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        except Users.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)

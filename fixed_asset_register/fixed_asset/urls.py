@@ -48,6 +48,7 @@ urlpatterns = [
     path('fixed-assets/<int:pk>/asset-disposals/',FixedAssetDisposalAPI.as_view()),
     path('fixed-assets/<int:pk>/asset-components/',FixedAssetComponentAPI.as_view()),
     path('signup/', SignupView.as_view(), name='signup'),
+    path('login/', LoginView.as_view(), name='login'),
 
     path('', include(router.urls)),
     
