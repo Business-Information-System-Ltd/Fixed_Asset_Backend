@@ -657,7 +657,7 @@ class Role(models.Model):
     role_name = models.CharField(max_length=50, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
-        db_table = 'roles'
+        db_table = 'role'
 
 class Users(models.Model):
     id = models.AutoField(primary_key=True)
