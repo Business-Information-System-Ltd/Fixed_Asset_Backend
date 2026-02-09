@@ -19,6 +19,7 @@ router.register(r'asset-policies', AssetPolicyViewSet)
 router.register(r'asset-disposals', AssetDisposalViewSet)
 router.register(r'asset-adjustments', AssetAdjustmentViewSet)
 router.register(r'asset-dept-histories', AssetDepartmentHistoryViewSet)
+router.register(r'roles', RoleViewSet)
 
 urlpatterns = [
     path('depreciation/calculate/', DepreciationCalculationAPI.as_view(), name='depreciation-calculation'),

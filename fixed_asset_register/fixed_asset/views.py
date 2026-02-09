@@ -81,6 +81,10 @@ class AssetDepartmentHistoryViewSet(viewsets.ModelViewSet):
     queryset = AssetDepartmentHistory.objects.all()
     serializer_class = AssetDepartmentHistorySerializer
 
+class RoleViewSet(viewsets.ModelViewSet):
+    queryset = Role.objects.all()
+    serializer_class = RoleSerializer
+
 
 class DepreciationCalculationAPI(APIView):
     def post(self, request):

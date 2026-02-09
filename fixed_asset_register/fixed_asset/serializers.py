@@ -197,6 +197,11 @@ class AssetDepartmentHistorySerializer(serializers.ModelSerializer):
         model = AssetDepartmentHistory
         fields = '__all__'
 
+class RoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Role
+        fields = '__all__'
+
 class FixedAssetFullSerializer (serializers.ModelSerializer):
     asset_components = AssetComponentSerializer(many=True, read_only=True)
     depreciations = DepreciationSerializer(
