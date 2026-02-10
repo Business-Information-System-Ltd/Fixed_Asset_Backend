@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import *
 from .views import DepreciationCalculationAPI
+from .views import google_login
 
 router = DefaultRouter()
 router.register(r'companies', CompanyViewSet)
@@ -50,6 +51,7 @@ urlpatterns = [
     path('fixed-assets/<int:pk>/asset-components/',FixedAssetComponentAPI.as_view()),
     path('signup/', SignupView.as_view(), name='signup'),
     path('login/', LoginView.as_view(), name='login'),
+    path('google-login/', google_login, name='google_login'),
 
     path('', include(router.urls)),
     

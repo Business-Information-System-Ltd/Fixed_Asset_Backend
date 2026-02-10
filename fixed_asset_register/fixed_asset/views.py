@@ -12,6 +12,11 @@ from .serializers import *
 from django.shortcuts import get_object_or_404
 import traceback
 from rest_framework.permissions import AllowAny
+from google.oauth2 import id_token
+from google.auth.transport import requests
+from django.contrib.auth.models import User
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from .services.depreciation import (
     get_total_units,
     get_elapsed_units,
@@ -412,3 +417,30 @@ class LoginView(APIView):
         
         except Users.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+@csrf_exempt
+def google_login(request):
+    if request.method == "POST":
+        token = request.POST.get('token')
+        CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+
+        try:
+            idinfo = id_token.verify_oauth2_token(token, requests.Request(), CLIENT_ID)
+            email = idinfo['email']
+            name = idinfo.get('name', '')
+
+            user, created = User.objects.get_or_create(
+                email=email, 
+                defaults={'username': email, 'first_name': name}
+            )
+
+            return JsonResponse({
+                "status": "success",
+                "user_id": user.id,
+                "email": user.email
+            })
+        except ValueError:
+            return JsonResponse({"status": "error", "message": "Invalid token"}, status=400)
+    
+ 
+    return JsonResponse({"status": "error", "message": "Only POST requests are allowed"}, status=405)
