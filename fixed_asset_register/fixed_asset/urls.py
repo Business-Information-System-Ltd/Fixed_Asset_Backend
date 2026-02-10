@@ -52,6 +52,7 @@ urlpatterns = [
     path('signup/', SignupView.as_view(), name='signup'),
     path('login/', LoginView.as_view(), name='login'),
     path('google-login/', google_login, name='google_login'),
+    path('microsoft-login/', microsoft_login, name='microsoft_login'),
 
     path('', include(router.urls)),
     

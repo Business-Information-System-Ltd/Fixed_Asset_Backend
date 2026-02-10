@@ -15,6 +15,7 @@ from rest_framework.permissions import AllowAny
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from django.contrib.auth.models import User
+import jwt
 from django.http import JsonResponse
 import requests as http_requests
 from django.views.decorators.csrf import csrf_exempt
@@ -469,4 +470,46 @@ def google_login(request):
             return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
     
+    return JsonResponse({"status": "error", "message": "Method Not Allowed"}, status=405)
+
+@csrf_exempt
+def microsoft_login(request):
+    if request.method == "POST":
+        token = request.POST.get('token')
+        
+        if not token:
+            return JsonResponse({"status": "error", "message": "No token provided"}, status=400)
+
+        try:
+            
+            decoded_data = jwt.decode(token, options={"verify_signature": False})
+
+            
+            email = decoded_data.get('preferred_username') or decoded_data.get('email')
+            name = decoded_data.get('name', '')
+
+            if not email:
+                return JsonResponse({"status": "error", "message": "Email not found in token"}, status=400)
+
+            
+            user, created = Users.objects.get_or_create(
+                email=email, 
+                defaults={
+                    'name': name,
+                    'auth_provider': 'microsoft',
+                    'department_id': 1,
+                    'role_id': 1
+                }
+            )
+
+            return JsonResponse({
+                "status": "success",
+                "user_id": user.id,
+                "email": user.email,
+                "created": created
+            })
+        
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
     return JsonResponse({"status": "error", "message": "Method Not Allowed"}, status=405)

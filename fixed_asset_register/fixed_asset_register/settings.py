@@ -143,5 +143,10 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
+    "https://far.bizsoft.com.mm",
+    "http://localhost:52783",
     "https://gentle-moss-03b9b8b0f.4.azurestaticapps.net",
 ]
+
+AZURE_TENANT_ID = "6424c4c1-87db-4bee-b669-52a240a51619"
+AZURE_CLIENT_ID = "c40df40a-9e4b-4280-89ea-b77effba21b3"
