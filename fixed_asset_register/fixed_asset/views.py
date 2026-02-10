@@ -16,6 +16,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 from django.contrib.auth.models import User
 from django.http import JsonResponse
+import requests as http_requests
 from django.views.decorators.csrf import csrf_exempt
 from .services.depreciation import (
     get_total_units,
@@ -418,29 +419,54 @@ class LoginView(APIView):
         except Users.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         
+  
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from .models import Users 
+
 @csrf_exempt
 def google_login(request):
     if request.method == "POST":
         token = request.POST.get('token')
-        CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+        
+        if not token:
+            return JsonResponse({"status": "error", "message": "No token provided"}, status=400)
 
+        
+        user_info_url = "https://www.googleapis.com/oauth2/v3/userinfo"
+        headers = {'Authorization': f'Bearer {token}'}
+        
         try:
-            idinfo = id_token.verify_oauth2_token(token, requests.Request(), CLIENT_ID)
-            email = idinfo['email']
-            name = idinfo.get('name', '')
+            response = http_requests.get(user_info_url, headers=headers)
+            user_data = response.json()
 
-            user, created = User.objects.get_or_create(
-                email=email, 
-                defaults={'username': email, 'first_name': name}
-            )
+            if response.status_code == 200:
+                email = user_data.get('email')
+                name = user_data.get('name', '')
 
-            return JsonResponse({
-                "status": "success",
-                "user_id": user.id,
-                "email": user.email
-            })
-        except ValueError:
-            return JsonResponse({"status": "error", "message": "Invalid token"}, status=400)
+                user, created = Users.objects.get_or_create(
+                    email=email, 
+                    defaults={
+                        'name': name,
+                        'auth_provider': 'google',
+                        'department_id': 1,
+                        'role_id': 1
+                    }
+
+                    
+                        
+                )
+
+                return JsonResponse({
+                    "status": "success",
+                    "user_id": user.id,
+                    "email": user.email
+                })
+            else:
+                return JsonResponse({"status": "error", "message": "Google Token Invalid"}, status=400)
+        
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
     
- 
-    return JsonResponse({"status": "error", "message": "Only POST requests are allowed"}, status=405)
+    return JsonResponse({"status": "error", "message": "Method Not Allowed"}, status=405)
