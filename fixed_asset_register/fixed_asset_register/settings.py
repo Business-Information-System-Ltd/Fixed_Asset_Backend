@@ -31,6 +31,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = [
     "127.0.0.1",
+    "172.16.0.9",
     "fixedassetbackend-dchggqcdd7gefsb5.canadacentral-01.azurewebsites.net",
     "localhost"
     ]
@@ -99,6 +100,19 @@ DATABASES = {
             }
     }
 }
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'FIXED_ASSET',
+#         'USER': 'lease_user',
+#         'PASSWORD': 'lease_pass123',
+#         'HOST':'172.16.0.9',
+#         'PORT': '3306',  
+#         'OPTIONS': {
+#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+#             }
+#     }
+# }
 
 
 # Password validation
@@ -144,7 +158,7 @@ CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "https://far.bizsoft.com.mm",
-    "http://localhost:52783",
+    "http://localhost:58037",
     "https://gentle-moss-03b9b8b0f.4.azurestaticapps.net",
 ]
 

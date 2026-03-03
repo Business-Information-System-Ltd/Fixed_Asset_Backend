@@ -237,3 +237,27 @@ class UserSignupSerializer(serializers.ModelSerializer):
         if validated_data.get('password_hash'):
             validated_data['password_hash'] = make_password(validated_data['password_hash'])
         return super().create(validated_data)
+    
+class LeaseFinancialSerializer(serializers.ModelSerializer):
+    amortization_schedule = serializers.SerializerMethodField()
+    class Meta:
+        model = LeaseFinancial
+        fields = '__all__'
+
+    def get_amortization_schedule(self, obj):
+        
+        return obj.get_amortization_schedule()
+    
+    def get_rou_asset_schedule(self, obj):
+        return obj.get_rou_asset_schedule()
+
+
+
+class LeaseContractSerializer(serializers.ModelSerializer):
+    
+    financial = LeaseFinancialSerializer(read_only=True)
+    read_only_fields = ('present_value',)
+    
+    class Meta:
+        model = LeaseContract
+        fields = '__all__'

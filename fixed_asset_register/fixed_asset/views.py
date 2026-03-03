@@ -513,3 +513,12 @@ def microsoft_login(request):
             return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
     return JsonResponse({"status": "error", "message": "Method Not Allowed"}, status=405)
+class LeaseContractViewSet(viewsets.ModelViewSet):
+    queryset = LeaseContract.objects.all()
+    serializer_class = LeaseContractSerializer
+    
+class LeaseFinancialViewSet(viewsets.ModelViewSet):
+    present_value = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    queryset = LeaseFinancial.objects.all()
+    serializer_class = LeaseFinancialSerializer
+

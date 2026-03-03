@@ -677,6 +677,290 @@ class Users(models.Model):
 
     class Meta:
         db_table = 'users'
+
+class LeaseContract(models.Model):
+   
+    STATUS_CHOICES = [
+        ('Active', 'Active'),
+        ('Completed', 'Completed'),
+        ('Cancelled', 'Cancelled'),
+        ('Amendment', 'Amendment'),
+    ]
+
+    code = models.CharField(max_length=50, unique=True)
+    lease_type = models.CharField(max_length=100)
+    description = models.TextField(null=True, blank=True)
+    leasor_name = models.CharField(max_length=255)
+    contract_date = models.DateField()
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES, 
+        default='Active'
+    )
+
+    class Meta:
+        db_table = 'lease_contract'
+
+    def __str__(self):
+        return f"{self.code} - {self.leasor_name}"
+
+
+class LeaseFinancial(models.Model):
+    PERIOD_CHOICES = [
+        ('Year', 'Year'),
+        ('Month', 'Month'),
+    ]
+    
+    COMPUTATION_CHOICES = [
+        ('Month', 'Month'),
+        ('Year', 'Year'),
+        ('Quaterly', 'Quaterly'),
+        ('Half of Year', 'Half of Year'),
+    ]
+
+    lease = models.OneToOneField(
+        LeaseContract, 
+        on_delete=models.CASCADE, 
+        related_name='financial'
+    )
+    contract_amount = models.DecimalField(max_digits=20, decimal_places=2)
+    deposit = models.DecimalField(max_digits=20, decimal_places=2)
+    present_value = models.DecimalField(max_digits=20, decimal_places=2, editable=False, default=0.0)
+    down_payment = models.DecimalField(max_digits=20, decimal_places=2)
+    other_cost = models.DecimalField(max_digits=20, decimal_places=2)
+    dismantling_cost = models.DecimalField(max_digits=20, decimal_places=2)
+    currency = models.CharField(max_length=10)
+    home_currency = models.CharField(max_length=10)
+    exchange_rate = models.DecimalField(max_digits=15, decimal_places=4)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    lease_term = models.IntegerField()
+    lease_period = models.CharField(max_length=10, choices=PERIOD_CHOICES)
+    discount_rate = models.FloatField() 
+    # extensions = models.BooleanField(default=False)
+    payment_amount = models.DecimalField(max_digits=20, decimal_places=2)
+    payment_period = models.CharField(max_length=10, choices=PERIOD_CHOICES)
+    computation = models.CharField(max_length=20, choices=COMPUTATION_CHOICES)
+    changing_date = models.DateField(null=True, blank=True)
+    changing_amount = models.DecimalField(max_digits=20, decimal_places=2, default=0.0)
+    reason = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'lease_financial'
+
+    def get_calculated_pv(self):
+        total_pv = Decimal('0.00')
+        discount_rate = Decimal(str(self.discount_rate)) / 100
+
+        is_yearly = self.computation.lower() == 'year'
+        total_periods = self.lease_term if is_yearly else self.lease_term * 12
+        
+       
+        # periodic_rate = discount_rate if is_yearly else (Decimal('1') + discount_rate) ** (Decimal('1')/12) - 1
+        if is_yearly:
+            periodic_rate = discount_rate
+        else:
+           
+            periodic_rate = discount_rate / 12
+        
+        change_at_period = None
+        if self.changing_date:
+            diff = relativedelta(self.changing_date, self.start_date)
+            total_months_diff = diff.years * 12 + diff.months
+            change_at_period = (total_months_diff // 12) if is_yearly else total_months_diff
+
+        for t in range(1, total_periods + 1):
+            
+            current_payment = Decimal(str(self.payment_amount))
+            if change_at_period and t > change_at_period:
+                current_payment = Decimal(str(self.changing_amount))
+
+            
+            pv_of_period = current_payment / ((Decimal('1') + periodic_rate) ** t)
+            total_pv += pv_of_period
+
+        
+        total_pv += Decimal(str(self.down_payment))
+        return total_pv.quantize(Decimal('0.01'))
+
+    def save(self, *args, **kwargs):
+        self.present_value = self.get_calculated_pv()
+        super().save(*args, **kwargs)
+
+    def get_amortization_schedule(self):
+        
+        schedule = []
+        
+        remaining_balance = self.present_value 
+        
+        discount_rate = Decimal(str(self.discount_rate)) / 100
+        is_yearly = self.computation.lower() == 'year'
+        periodic_rate = discount_rate / (1 if is_yearly else 12)
+        total_periods = self.lease_term if is_yearly else self.lease_term * 12
+
+        change_at_period = None
+        if self.changing_date:
+            diff = relativedelta(self.changing_date, self.start_date)
+            months = diff.years * 12 + diff.months
+            change_at_period = (months // 12) if is_yearly else months
+
+        current_date = self.start_date
+        for t in range(1, total_periods + 1):
+            interest_expense = remaining_balance * periodic_rate
+            
+            payment = Decimal(str(self.payment_amount))
+            if change_at_period and t > change_at_period:
+                payment = Decimal(str(self.changing_amount))
+
+            principal_reduction = payment - interest_expense
+            opening_bal = remaining_balance
+            remaining_balance -= principal_reduction
+            
+            
+            if is_yearly:
+                current_date = current_date + relativedelta(years=1)
+            else:
+                current_date = current_date + relativedelta(months=1)
+
+            schedule.append({
+                "period": t,
+                "date": current_date.strftime('%Y-%m-%d'),
+                "opening_balance": round(opening_bal, 2),
+                "payment": round(payment, 2),
+                "interest": round(interest_expense, 2),
+                "principal": round(principal_reduction, 2),
+                "closing_balance": round(max(0, remaining_balance), 2)
+            })
+        return schedule
+
+    def save(self, *args, **kwargs):
+        
+        self.present_value = self.get_calculated_pv()
+        super().save(*args, **kwargs)
+
+    def get_rou_asset_schedule(self):
+   
+        dp = self.down_payment or Decimal('0.00')
+        oc = self.other_cost or Decimal('0.00')
+        dc = self.dismantling_cost or Decimal('0.00')
+        pv = self.present_value or Decimal('0.00')
+
+        # Initial ROU calculation
+        initial_rou = pv + dp + oc + dc
+        
+        is_yearly = self.computation.lower() == 'year'
+        total_periods = self.lease_term if is_yearly else self.lease_term * 12
+    
+    
+        periodic_depreciation = initial_rou / total_periods if total_periods > 0 else Decimal('0.00')
+        
+        rou_schedule = []
+        remaining_rou = initial_rou
+        current_date = self.start_date
+        
+        for t in range(1, total_periods + 1):
+            opening_rou = remaining_rou
+            
+            
+            if t == total_periods:
+                depreciation = opening_rou
+            else:
+                depreciation = periodic_depreciation
+                
+            closing_rou = opening_rou - depreciation
+            remaining_rou = closing_rou
+        
+        
+            if is_yearly:
+                current_date = current_date + relativedelta(years=1)
+            else:
+                current_date = current_date + relativedelta(months=1)
+
+            rou_schedule.append({
+                "period": t,
+                "date": current_date.strftime('%Y-%m-%d'),
+                "opening_rou": round(opening_rou, 2),
+                "depreciation": round(depreciation, 2),
+                "closing_rou": round(max(0, closing_rou), 2)
+            })
+            
+        return rou_schedule
     
 
+class DepreciationAuditLog(models.Model):
+    ACTION_CHOICES = [
+        ('CREATE', 'Create'),
+        ('RECALCULATE', 'Recalculate'),
+        ('ADJUST', 'Adjust'),
+        ('DELETE', 'Delete'),
+    ]
 
+    audit_id = models.AutoField(primary_key=True)
+   
+    register = models.ForeignKey(
+        FixedAssetRegister,
+        on_delete=models.CASCADE,
+        db_column='register_id'
+    )
+
+    depreciation = models.ForeignKey(
+        Depreciation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='depreciation_id'
+    )
+
+    action_type = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    depreciation_date = models.DateField()
+    old_book_value = models.FloatField(null=True, blank=True)
+    new_book_value = models.FloatField()
+    old_accumulated = models. FloatField(null=True, blank=True)
+    new_accumulated = models.FloatField(null=True, blank=True)
+
+    performed_by = models.ForeignKey(
+        Users,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='performed_by'
+    )
+
+    performed_at = models.DateTimeField(auto_now_add=True)
+    remark = models.CharField(max_length=500, null=True, blank=True)
+
+    class Meta:
+        db_table = 'depreciation_audit_log'
+        ordering = ['-performed_at']
+
+    def __str__(self):
+        return f"Audit {self.audit_id} - {self.register.fixed_asset_code}"
+    
+def run_depreciation(register_id, user_id):
+    register = FixedAssetRegister.objects.get(pk=register_id)  
+    user = Users.objects.get(pk=user_id)
+
+    old_nbv = register.current_nbv
+
+    if register.depreciation_method == 'Straight Line':
+        accumulated = register.straight_line_accumulated()
+
+    elif register.depreciation_method == 'Double Declining':
+         accumulated = register.double_declining(
+            register.total_amount,
+            register.residual_value,
+            register.useful_life,
+            register.get_elasped_units(),
+            register.computation
+
+        )
+    else:
+        accumulated = register.reducing_balance(
+            register.total_amount,
+            register.residual_value,
+            register.useful_life,
+            register.get_elasped_units(),
+            register.computation
+        )
+
+    new_nbv = float(register.total_amount) - float(accumulated)
