@@ -421,56 +421,103 @@ class LoginView(APIView):
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         
   
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from .models import Users 
+# from django.http import JsonResponse
+# from django.views.decorators.csrf import csrf_exempt
+# from .models import Users 
 
-@csrf_exempt
-def google_login(request):
-    if request.method == "POST":
-        token = request.POST.get('token')
+# @csrf_exempt
+# def google_login(request):
+#     if request.method == "POST":
+#         token = request.POST.get('token')
         
-        if not token:
-            return JsonResponse({"status": "error", "message": "No token provided"}, status=400)
+#         if not token:
+#             return JsonResponse({"status": "error", "message": "No token provided"}, status=400)
 
         
-        user_info_url = "https://www.googleapis.com/oauth2/v3/userinfo"
-        headers = {'Authorization': f'Bearer {token}'}
+#         user_info_url = "https://www.googleapis.com/oauth2/v3/userinfo"
+#         headers = {'Authorization': f'Bearer {token}'}
         
-        try:
-            response = http_requests.get(user_info_url, headers=headers)
-            user_data = response.json()
+#         try:
+#             response = http_requests.get(user_info_url, headers=headers)
+#             user_data = response.json()
 
-            if response.status_code == 200:
-                email = user_data.get('email')
-                name = user_data.get('name', '')
+#             if response.status_code == 200:
+#                 email = user_data.get('email')
+#                 name = user_data.get('name', '')
 
-                user, created = Users.objects.get_or_create(
-                    email=email, 
-                    defaults={
-                        'name': name,
-                        'auth_provider': 'google',
-                        'department_id': 1,
-                        'role_id': 1
-                    }
+#                 user, created = Users.objects.get_or_create(
+#                     email=email, 
+#                     defaults={
+#                         'name': name,
+#                         'auth_provider': 'google',
+#                         'department_id': 1,
+#                         'role_id': 1
+#                     }
 
                     
                         
-                )
+#                 )
 
-                return JsonResponse({
-                    "status": "success",
-                    "user_id": user.id,
-                    "email": user.email
-                })
-            else:
-                return JsonResponse({"status": "error", "message": "Google Token Invalid"}, status=400)
+#                 return JsonResponse({
+#                     "status": "success",
+#                     "user_id": user.id,
+#                     "email": user.email
+#                 })
+#             else:
+#                 return JsonResponse({"status": "error", "message": "Google Token Invalid"}, status=400)
         
-        except Exception as e:
-            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+#         except Exception as e:
+#             return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
     
-    return JsonResponse({"status": "error", "message": "Method Not Allowed"}, status=405)
+#     return JsonResponse({"status": "error", "message": "Method Not Allowed"}, status=405)
+
+import requests
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.tokens import RefreshToken
+
+User = get_user_model()
+
+@api_view(['POST'])
+def google_login(request):
+    access_token = request.data.get("access_token")
+
+    if not access_token:
+        return Response({"error": "Access token missing"}, status=400)
+
+    # ✅ Verify token with Google
+    google_response = requests.get(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+
+    if google_response.status_code != 200:
+        return Response({"error": "Invalid token"}, status=400)
+
+    user_info = google_response.json()
+
+    email = user_info.get("email")
+    name = user_info.get("name")
+
+    if not email:
+        return Response({"error": "Email not found"}, status=400)
+
+    # ✅ Create or Get User
+    user, created = User.objects.get_or_create(
+        email=email,
+        defaults={"username": email, "first_name": name}
+    )
+
+    # ✅ Generate JWT
+    refresh = RefreshToken.for_user(user)
+
+    return Response({
+        "email": user.email,
+        "access": str(refresh.access_token),
+        "refresh": str(refresh),
+    })
 
 @csrf_exempt
 def microsoft_login(request):
@@ -513,6 +560,33 @@ def microsoft_login(request):
             return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
     return JsonResponse({"status": "error", "message": "Method Not Allowed"}, status=405)
+
+class AssetBookViewSet(viewsets.ModelViewSet):
+    queryset = AssetBook.objects.all()
+    serializer_class = AssetBookSerializer
+
+class SystemDefaultViewSet(viewsets.ModelViewSet):
+    queryset = SystemDefault.objects.all()
+    serializer_class = SystemDefaultSerializer
+
+class ConventionListViewSet(viewsets.ModelViewSet):
+    queryset = ConventionList.objects.all()
+    serializer_class = ConventionListSerializer
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+
+class BookLevelPolicyViewSet(viewsets.ModelViewSet):
+    queryset = BookLevelPolicy.objects.all()
+    serializer_class = BookLevelPolicySerializer
+
+class AssetCategoryPolicyViewSet(viewsets.ModelViewSet):
+    queryset = AssetCategoryPolicy.objects.all()
+    serializer_class = AssetCategoryPolicySerializer
+
+
+
 class LeaseContractViewSet(viewsets.ModelViewSet):
     queryset = LeaseContract.objects.all()
     serializer_class = LeaseContractSerializer

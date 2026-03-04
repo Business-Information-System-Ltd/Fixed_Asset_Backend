@@ -21,6 +21,13 @@ router.register(r'asset-disposals', AssetDisposalViewSet)
 router.register(r'asset-adjustments', AssetAdjustmentViewSet)
 router.register(r'asset-dept-histories', AssetDepartmentHistoryViewSet)
 router.register(r'roles', RoleViewSet)
+router.register(r'asset-books', AssetBookViewSet)
+router.register(r'system-default', SystemDefaultViewSet)
+router.register(r'convention-lists', ConventionListViewSet)
+router.register(r'categories', CategoryViewSet)
+router.register(r'book-level-policies', BookLevelPolicyViewSet)
+router.register(r'asset-category-policies', AssetCategoryPolicyViewSet)
+
 router.register(r'leases-contracts', LeaseContractViewSet, basename='leasecontract')
 router.register(r'leases-financials', LeaseFinancialViewSet, basename='leasefinancial')
 

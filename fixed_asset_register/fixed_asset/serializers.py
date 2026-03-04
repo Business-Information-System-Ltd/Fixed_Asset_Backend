@@ -238,6 +238,37 @@ class UserSignupSerializer(serializers.ModelSerializer):
             validated_data['password_hash'] = make_password(validated_data['password_hash'])
         return super().create(validated_data)
     
+
+class AssetBookSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssetBook
+        fields = '__all__'
+
+class SystemDefaultSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SystemDefault
+        fields = '__all__'
+
+class ConventionListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConventionList
+        fields = '__all__'
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = '__all__'
+
+class BookLevelPolicySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BookLevelPolicy
+        fields = '__all__'
+
+class AssetCategoryPolicySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssetCategoryPolicy
+        fields = '__all__'
+    
 class LeaseFinancialSerializer(serializers.ModelSerializer):
     amortization_schedule = serializers.SerializerMethodField()
     class Meta:

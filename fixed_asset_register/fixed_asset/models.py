@@ -678,6 +678,192 @@ class Users(models.Model):
     class Meta:
         db_table = 'users'
 
+
+class AssetBook(models.Model):
+    book_id = models.AutoField(primary_key=True)
+    book_name = models.CharField(max_length=100)
+    multi_book_support = models.BooleanField(default=True)
+    isActive = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.book_name
+    
+    class Meta:
+        db_table = 'asset_book'
+    
+
+class SystemDefault(models.Model):
+    DEPRECIATION_FREQUENCY_CHOICES = [
+        ('Monthly', 'Monthly'),
+        ('Quarterly', 'Quarterly'),
+        ('Annually', 'Annually'),
+    ]
+
+    POSTING_DATE_RULE_CHOICES = [
+        ('End of Month', 'End of Month'),
+        ('Last Working Day', 'Last Working Day'),
+        ('Custom', 'Custom'),
+    ]
+
+    DEPRECIATION_START_RULE_CHOICES = [
+        ('From Capitalization Date', 'From Capitalization Date'),
+        ('From Ready-for-Use Date', 'From Ready-for-Use Date'),
+        ('From Beginning of Next Period', 'From Beginning of Next Period'),
+        ('From Beginning of Next Financial Year', 'From Beginning of Next Financial Year'),
+    ]
+
+    DEPRECIATION_CONVENTION_CHOICES = [
+        ('Exact Date (IFRS - Daily Pro-rata)', 'Exact Date (IFRS - Daily Pro-rata)'),
+        ('Monthly Pro-rata', 'Monthly Pro-rata'),
+        ('Full-Year Convention - No Acquisition Year', 'Full-Year Convention - No Acquisition Year'),
+        ('Full-Year Convention - No Disposal Year', 'Full-Year Convention - No Disposal Year'),
+        ('Half-Year Convention', 'Half-Year Convention'),
+    ]
+    default_id = models.AutoField(primary_key=True)
+    depreciation_frequency = models.CharField(
+        max_length=20, choices=DEPRECIATION_FREQUENCY_CHOICES
+    )
+    posting_date_rule = models.CharField(
+        max_length=20, choices=POSTING_DATE_RULE_CHOICES
+    )
+    rounding_precision = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    prevent_negative_NBV = models.BooleanField(default=True)
+    stop_at_residual_value = models.BooleanField(default=True)
+    period_lock_required = models.BooleanField(default=True)
+    allow_posting_to_closed_period = models.BooleanField(default=False)
+
+    depreciation_start_rule = models.CharField(
+        max_length=50, choices=DEPRECIATION_START_RULE_CHOICES
+    )
+    depreciation_convention = models.CharField(
+        max_length=50, choices=DEPRECIATION_CONVENTION_CHOICES
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'system_default'
+
+    def __str__(self):
+        return f"System Default {self.default_id}"
+
+
+class ConventionList(models.Model):
+    CONVENTION_CHOICES = [
+        ('Exact Date (IFRS - Daily Pro-rata)', 'Exact Date (IFRS - Daily Pro-rata)'),
+        ('Monthly Pro-rata', 'Monthly Pro-rata'),
+        ('Full-Year Convention - No Acquisition Year', 'Full-Year Convention - No Acquisition Year'),
+        ('Full-Year Convention - No Disposal Year', 'Full-Year Convention - No Disposal Year'),
+        ('Half-Year Convention', 'Half-Year Convention'),
+    ]
+    convention_id = models.AutoField(primary_key=True)
+    convention_name = models.CharField(max_length=100, choices=CONVENTION_CHOICES)
+    apply_prorata_acquisition = models.BooleanField(default=False)
+    apply_prorata_disposal = models.BooleanField(default=False)
+    full_depre_in_acquisition_yr = models.BooleanField(default=False)
+    no_depre_in_disposal_yr = models.BooleanField(default=False)
+    start_from_next_financial_yr = models.BooleanField(default=False)
+    note = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'convention_list'
+
+    def __str__(self):
+        return self.convention_name
+    
+
+class Category(models.Model):
+    category_id = models.AutoField(primary_key=True)
+    category_code = models.CharField(max_length=50, unique=True)
+    category_name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'category'
+
+    def __str__(self):
+        return self.category_name
+    
+
+class BookLevelPolicy(models.Model):
+    BOOK_LEVEL_CHOICES = [
+        ('IFRS', 'IFRS'),
+        ('Tax', 'Tax'),
+        ('Management', 'Management'),
+    ]
+    book_level_policy_id = models.AutoField(primary_key=True)
+    DEPRECIATION_FREQUENCY_CHOICES = SystemDefault.DEPRECIATION_FREQUENCY_CHOICES
+    POSTING_DATE_RULE_CHOICES = SystemDefault.POSTING_DATE_RULE_CHOICES
+    DEPRECIATION_START_RULE_CHOICES = SystemDefault.DEPRECIATION_START_RULE_CHOICES
+    DEPRECIATION_CONVENTION_CHOICES = SystemDefault.DEPRECIATION_CONVENTION_CHOICES
+
+    book = models.ForeignKey(AssetBook, on_delete=models.CASCADE,db_column='book_id')
+    default = models.ForeignKey(SystemDefault, on_delete=models.CASCADE, db_column='default_id')
+    convention = models.ForeignKey(ConventionList, on_delete=models.CASCADE, db_column='convention_id')
+
+    book_level = models.CharField(max_length=20, choices=BOOK_LEVEL_CHOICES)
+
+    depreciation_frequency = models.CharField(max_length=20, choices=DEPRECIATION_FREQUENCY_CHOICES, blank=True, null=True)
+    posting_date_rule = models.CharField(max_length=20, choices=POSTING_DATE_RULE_CHOICES)
+    rounding_precision = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+
+    prevent_negative_NBV = models.BooleanField(blank=True, default=False)
+    stop_at_residual_value = models.BooleanField(blank=True, default=False)
+    period_lock_required = models.BooleanField(blank=True, default=False)
+    allow_posting_to_closed_period = models.BooleanField(blank=True, default=False)
+
+    depreciation_start_rule = models.CharField(max_length=50, choices=DEPRECIATION_START_RULE_CHOICES)
+    depreciation_convention = models.CharField(max_length=50, choices=DEPRECIATION_CONVENTION_CHOICES)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'book_level_policy'
+
+    def __str__(self):
+        return f"{self.book.book_name} - {self.book_level}"
+
+
+class AssetCategoryPolicy(models.Model):
+    PERIOD_CHOICES = [
+        ('Month', 'Month'),
+        ('Year', 'Year'),
+    ]
+    asset_category_policy_id = models.AutoField(primary_key=True)
+    DEPRECIATION_FREQUENCY_CHOICES = SystemDefault.DEPRECIATION_FREQUENCY_CHOICES
+
+    book_level_policy = models.ForeignKey(BookLevelPolicy, on_delete=models.CASCADE, db_column='book_level_policy_id')
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, db_column='category_id')
+
+    depreciation_frequency = models.CharField(max_length=20, choices=DEPRECIATION_FREQUENCY_CHOICES, blank=True, null=True)
+    useful_life = models.PositiveIntegerField()
+    period = models.CharField(max_length=10, choices=PERIOD_CHOICES)
+    residual_value = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+
+    use_book_default = models.BooleanField(default=True)
+    override_convention_for_category = models.BooleanField(default=False)
+
+    exact_date_ifrs = models.BooleanField(default=False)
+    monthly_prorata = models.BooleanField(default=False)
+    full_yr_no_acquisition_yr = models.BooleanField(default=False)
+    half_yr = models.BooleanField(default=False)
+
+    allow_useful_life_override = models.BooleanField(default=False)
+    allow_residual_override = models.BooleanField(default=False)
+    allow_method_override = models.BooleanField(default=False)
+    allow_convention_override = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'asset_category_policy'
+
+    def __str__(self):
+        return f"{self.category.category_name} - {self.book_level_policy.book.book_name}"
+
 class LeaseContract(models.Model):
    
     STATUS_CHOICES = [
@@ -692,6 +878,16 @@ class LeaseContract(models.Model):
     description = models.TextField(null=True, blank=True)
     leasor_name = models.CharField(max_length=255)
     contract_date = models.DateField()
+    phone_no = models.CharField(max_length=20, blank=True)
+    email = models.CharField(max_length=50, blank=True)
+    location = models.CharField(max_length=255, blank=True)
+    commencement_date = models.DateField()
+    expiry_date = models.DateField()
+    extension_option = models.BooleanField(null=True, blank=True, default='False')
+    extension_years = models.IntegerField(blank=True)
+    termination_certain_date = models.DateField()
+
+
     status = models.CharField(
         max_length=20, 
         choices=STATUS_CHOICES, 
@@ -709,14 +905,40 @@ class LeaseFinancial(models.Model):
     PERIOD_CHOICES = [
         ('Year', 'Year'),
         ('Month', 'Month'),
+        ('Quaterly', 'Quaterly')
     ]
     
+    PAYMENT_PERIOD_CHOICES = [
+        ('Yearly', 'Yearly'),
+        ('Monthly', 'Monthly'),
+        ('Quaterly', 'Quaterly')
+    ]
+
     COMPUTATION_CHOICES = [
-        ('Month', 'Month'),
-        ('Year', 'Year'),
+        ('Monthly', 'Monthly'),
+        ('Yearly', 'Yearly'),
         ('Quaterly', 'Quaterly'),
         ('Half of Year', 'Half of Year'),
     ]
+
+    PAYMENT_TIMING_CHOICES = [
+        ('Advance', 'Advance'),
+        ('Arrears', 'Arrears')
+        
+    ]
+
+    DISCOUNT_RATE_CHOICES = [
+        ('IBR', 'IBR'),
+        ('Implicit', 'Implicit')
+    ]
+
+    ESCALATION_CHOICES = [
+        ('Fixed', 'Fixed'),
+        ('Percent', 'Percent'),
+        ('CPI', 'CPI'),
+        ('None', 'None'),
+    ]
+
 
     lease = models.OneToOneField(
         LeaseContract, 
@@ -738,11 +960,14 @@ class LeaseFinancial(models.Model):
     lease_period = models.CharField(max_length=10, choices=PERIOD_CHOICES)
     discount_rate = models.FloatField() 
     # extensions = models.BooleanField(default=False)
-    payment_amount = models.DecimalField(max_digits=20, decimal_places=2)
-    payment_period = models.CharField(max_length=10, choices=PERIOD_CHOICES)
+    payment_frequency = models.DecimalField(max_digits=20, decimal_places=2)
+    payment_period = models.CharField(max_length=10, choices=PAYMENT_PERIOD_CHOICES)
     computation = models.CharField(max_length=20, choices=COMPUTATION_CHOICES)
     changing_date = models.DateField(null=True, blank=True)
     changing_amount = models.DecimalField(max_digits=20, decimal_places=2, default=0.0)
+    payment_timing = models.CharField(max_length=20,choices=PAYMENT_TIMING_CHOICES)
+    discount_rate_type = models.CharField(max_length=20,choices=DISCOUNT_RATE_CHOICES)
+    escalation_type = models.CharField(max_length=20,choices=ESCALATION_CHOICES)
     reason = models.TextField(null=True, blank=True)
 
     class Meta:
@@ -771,7 +996,7 @@ class LeaseFinancial(models.Model):
 
         for t in range(1, total_periods + 1):
             
-            current_payment = Decimal(str(self.payment_amount))
+            current_payment = Decimal(str(self.payment_frequency))
             if change_at_period and t > change_at_period:
                 current_payment = Decimal(str(self.changing_amount))
 
@@ -808,7 +1033,7 @@ class LeaseFinancial(models.Model):
         for t in range(1, total_periods + 1):
             interest_expense = remaining_balance * periodic_rate
             
-            payment = Decimal(str(self.payment_amount))
+            payment = Decimal(str(self.payment_frequency))
             if change_at_period and t > change_at_period:
                 payment = Decimal(str(self.changing_amount))
 
