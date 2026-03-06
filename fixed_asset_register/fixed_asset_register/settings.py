@@ -159,6 +159,7 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "https://far.bizsoft.com.mm",
     "http://localhost:58037",
+    "http://localhost:57300",
     "https://gentle-moss-03b9b8b0f.4.azurestaticapps.net",
 ]
 

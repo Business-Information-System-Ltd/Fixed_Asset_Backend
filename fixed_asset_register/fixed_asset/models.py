@@ -802,7 +802,7 @@ class BookLevelPolicy(models.Model):
 
     book = models.ForeignKey(AssetBook, on_delete=models.CASCADE,db_column='book_id')
     default = models.ForeignKey(SystemDefault, on_delete=models.CASCADE, db_column='default_id')
-    convention = models.ForeignKey(ConventionList, on_delete=models.CASCADE, db_column='convention_id')
+    convention = models.ForeignKey(ConventionList, on_delete=models.CASCADE, db_column='convention_id',  null=True,blank=True)
 
     book_level = models.CharField(max_length=20, choices=BOOK_LEVEL_CHOICES)
 
