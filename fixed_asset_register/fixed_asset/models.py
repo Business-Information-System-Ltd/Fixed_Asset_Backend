@@ -832,6 +832,12 @@ class AssetCategoryPolicy(models.Model):
         ('Month', 'Month'),
         ('Year', 'Year'),
     ]
+
+    METHOD_CHOICES = [
+        ('Straight Line Method', 'Straight Line Method'),
+        ('Reducing Balance Method', 'Reducing Balance Method'),
+        ('Double Declining Method', 'Double Declining Method'),
+    ]
     asset_category_policy_id = models.AutoField(primary_key=True)
     DEPRECIATION_FREQUENCY_CHOICES = SystemDefault.DEPRECIATION_FREQUENCY_CHOICES
 
@@ -842,6 +848,7 @@ class AssetCategoryPolicy(models.Model):
     useful_life = models.PositiveIntegerField()
     period = models.CharField(max_length=10, choices=PERIOD_CHOICES)
     residual_value = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    method = models.CharField(max_length=30, choices=METHOD_CHOICES)
 
     use_book_default = models.BooleanField(default=True)
     override_convention_for_category = models.BooleanField(default=False)
@@ -849,6 +856,7 @@ class AssetCategoryPolicy(models.Model):
     exact_date_ifrs = models.BooleanField(default=False)
     monthly_prorata = models.BooleanField(default=False)
     full_yr_no_acquisition_yr = models.BooleanField(default=False)
+    full_yr_no_disposal_yr = models.BooleanField(default=False)
     half_yr = models.BooleanField(default=False)
 
     allow_useful_life_override = models.BooleanField(default=False)

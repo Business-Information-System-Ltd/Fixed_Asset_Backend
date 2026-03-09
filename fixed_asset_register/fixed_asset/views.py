@@ -484,33 +484,62 @@ def google_login(request):
         "refresh": str(refresh),
     }, status=200)
 
+TENANT_ID = "6424c4c1-87db-4bee-b669-52a240a51619"
+CLIENT_ID = "c40df40a-9e4b-4280-89ea-b77effba21b3"
+
 @csrf_exempt
 def microsoft_login(request):
     if request.method == "POST":
-        token = request.POST.get('token')
-        
+
+        body = json.loads(request.body)
+        token = body.get("token")
+
         if not token:
             return JsonResponse({"status": "error", "message": "No token provided"}, status=400)
 
         try:
-            
-            decoded_data = jwt.decode(token, options={"verify_signature": False})
 
-            
-            email = decoded_data.get('preferred_username') or decoded_data.get('email')
-            name = decoded_data.get('name', '')
+            # Microsoft public keys
+            jwks_url = f"https://login.microsoftonline.com/{TENANT_ID}/discovery/v2.0/keys"
+            jwks = requests.get(jwks_url).json()
+
+            unverified_header = jwt.get_unverified_header(token)
+
+            rsa_key = {}
+            for key in jwks["keys"]:
+                if key["kid"] == unverified_header["kid"]:
+                    rsa_key = {
+                        "kty": key["kty"],
+                        "kid": key["kid"],
+                        "use": key["use"],
+                        "n": key["n"],
+                        "e": key["e"],
+                    }
+
+            if not rsa_key:
+                return JsonResponse({"status": "error", "message": "Public key not found"}, status=400)
+
+            decoded = jwt.decode(
+                token,
+                jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(rsa_key)),
+                algorithms=["RS256"],
+                audience=CLIENT_ID,
+                issuer=f"https://login.microsoftonline.com/{TENANT_ID}/v2.0"
+            )
+
+            email = decoded.get("preferred_username") or decoded.get("email")
+            name = decoded.get("name", "")
 
             if not email:
-                return JsonResponse({"status": "error", "message": "Email not found in token"}, status=400)
+                return JsonResponse({"status": "error", "message": "Email not found"}, status=400)
 
-            
             user, created = Users.objects.get_or_create(
-                email=email, 
+                email=email,
                 defaults={
-                    'name': name,
-                    'auth_provider': 'microsoft',
-                    'department_id': 1,
-                    'role_id': 1
+                    "name": name,
+                    "auth_provider": "microsoft",
+                    "department_id": 1,
+                    "role_id": 1
                 }
             )
 
@@ -518,14 +547,14 @@ def microsoft_login(request):
                 "status": "success",
                 "user_id": user.id,
                 "email": user.email,
+                "name": user.name,
                 "created": created
             })
-        
+
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
-    return JsonResponse({"status": "error", "message": "Method Not Allowed"}, status=405)
-
+    return JsonResponse({"status": "error", "message": "Method not allowed"}, status=405)
 class AssetBookViewSet(viewsets.ModelViewSet):
     queryset = AssetBook.objects.all()
     serializer_class = AssetBookSerializer
