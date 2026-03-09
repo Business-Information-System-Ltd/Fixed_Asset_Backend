@@ -17,6 +17,11 @@ from google.auth.transport import requests
 from django.contrib.auth.models import User
 import jwt
 from django.http import JsonResponse
+import requests
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.tokens import RefreshToken
 import requests as http_requests
 from django.views.decorators.csrf import csrf_exempt
 from .services.depreciation import (
@@ -174,7 +179,6 @@ class ExecuteDepreciationAPI(APIView):
                     'error': f'Asset status must be "Ready to Use". Current status: {asset.asset_status}'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Get or create account
             try:
                 account = Account.objects.get(account_name=asset.fixed_asset_account)
             except Account.DoesNotExist:
@@ -183,7 +187,6 @@ class ExecuteDepreciationAPI(APIView):
                     account_type='Asset'
                 )
             
-            # Create Depreciation record
             depreciation = Depreciation.objects.create(
                 register=asset,
                 account=account,
@@ -195,7 +198,6 @@ class ExecuteDepreciationAPI(APIView):
                 depreciation_rate=0.0,  
             )
             
-            #  Get or create AssetPolicy
             policy, created = AssetPolicy.objects.get_or_create(
                 register=asset,
                 defaults={
@@ -210,7 +212,7 @@ class ExecuteDepreciationAPI(APIView):
                 }
             )
             
-            #  Create DepreciationEvent
+           
             depreciation_event = DepreciationEvent.objects.create(
                 register=asset,
                 policy=policy,
@@ -224,7 +226,7 @@ class ExecuteDepreciationAPI(APIView):
           
             asset.current_nbv = calculation_result.get('current_nbv', asset.current_nbv)
             
-            # Check if asset is fully depreciated
+          
             if asset.current_nbv <= asset.residual_value:
                 asset.asset_status = 'Finished'
             
@@ -421,59 +423,11 @@ class LoginView(APIView):
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         
   
-# from django.http import JsonResponse
-# from django.views.decorators.csrf import csrf_exempt
-# from .models import Users 
 
-# @csrf_exempt
-# def google_login(request):
-#     if request.method == "POST":
-#         token = request.POST.get('token')
-        
-#         if not token:
-#             return JsonResponse({"status": "error", "message": "No token provided"}, status=400)
-
-        
-#         user_info_url = "https://www.googleapis.com/oauth2/v3/userinfo"
-#         headers = {'Authorization': f'Bearer {token}'}
-        
-#         try:
-#             response = http_requests.get(user_info_url, headers=headers)
-#             user_data = response.json()
-
-#             if response.status_code == 200:
-#                 email = user_data.get('email')
-#                 name = user_data.get('name', '')
-
-#                 user, created = Users.objects.get_or_create(
-#                     email=email, 
-#                     defaults={
-#                         'name': name,
-#                         'auth_provider': 'google',
-#                         'department_id': 1,
-#                         'role_id': 1
-#                     }
-
-                    
-                        
-#                 )
-
-#                 return JsonResponse({
-#                     "status": "success",
-#                     "user_id": user.id,
-#                     "email": user.email
-#                 })
-#             else:
-#                 return JsonResponse({"status": "error", "message": "Google Token Invalid"}, status=400)
-        
-#         except Exception as e:
-#             return JsonResponse({"status": "error", "message": str(e)}, status=500)
-
-    
-#     return JsonResponse({"status": "error", "message": "Method Not Allowed"}, status=405)
 
 import requests
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -481,43 +435,54 @@ from rest_framework_simplejwt.tokens import RefreshToken
 User = get_user_model()
 
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def google_login(request):
     access_token = request.data.get("access_token")
 
     if not access_token:
         return Response({"error": "Access token missing"}, status=400)
 
-    # ✅ Verify token with Google
     google_response = requests.get(
         "https://www.googleapis.com/oauth2/v3/userinfo",
         headers={"Authorization": f"Bearer {access_token}"}
     )
 
     if google_response.status_code != 200:
-        return Response({"error": "Invalid token"}, status=400)
+        return Response({"error": "Invalid Google token"}, status=400)
 
     user_info = google_response.json()
-
     email = user_info.get("email")
-    name = user_info.get("name")
+    first_name = user_info.get("given_name", "")
+    last_name = user_info.get("family_name", "")
 
     if not email:
-        return Response({"error": "Email not found"}, status=400)
+        return Response({"error": "Email not provided by Google"}, status=400)
 
-    # ✅ Create or Get User
     user, created = User.objects.get_or_create(
         email=email,
-        defaults={"username": email, "first_name": name}
+        defaults={
+            "username": email,
+            "first_name": first_name,
+            "last_name": last_name,
+        }
     )
 
-    # ✅ Generate JWT
     refresh = RefreshToken.for_user(user)
 
+  
     return Response({
-        "email": user.email,
+        "message": "Login successful",
+        "user": {
+            "id": user.id,
+            "name": f"{user.first_name} {user.last_name}".strip() or user.username,
+            "email": user.email,
+            "role": "user",  
+            "department_name": "General", 
+            "auth_provider": "google"
+        },
         "access": str(refresh.access_token),
         "refresh": str(refresh),
-    })
+    }, status=200)
 
 @csrf_exempt
 def microsoft_login(request):
