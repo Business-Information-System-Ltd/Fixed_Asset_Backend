@@ -794,13 +794,17 @@ class BookLevelPolicy(models.Model):
         ('Tax', 'Tax'),
         ('Management', 'Management'),
     ]
+    book = models.OneToOneField(   
+        AssetBook,
+        on_delete=models.CASCADE,
+        db_column='book_id'
+    )
     book_level_policy_id = models.AutoField(primary_key=True)
     DEPRECIATION_FREQUENCY_CHOICES = SystemDefault.DEPRECIATION_FREQUENCY_CHOICES
     POSTING_DATE_RULE_CHOICES = SystemDefault.POSTING_DATE_RULE_CHOICES
     DEPRECIATION_START_RULE_CHOICES = SystemDefault.DEPRECIATION_START_RULE_CHOICES
     DEPRECIATION_CONVENTION_CHOICES = SystemDefault.DEPRECIATION_CONVENTION_CHOICES
 
-    book = models.ForeignKey(AssetBook, on_delete=models.CASCADE,db_column='book_id')
     default = models.ForeignKey(SystemDefault, on_delete=models.CASCADE, db_column='default_id')
     convention = models.ForeignKey(ConventionList, on_delete=models.CASCADE, db_column='convention_id',  null=True,blank=True)
 
