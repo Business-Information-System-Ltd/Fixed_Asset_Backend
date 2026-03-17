@@ -61,7 +61,9 @@ urlpatterns = [
     path('signup/', SignupView.as_view(), name='signup'),
     path('login/', LoginView.as_view(), name='login'),
     path('google-login/', google_login, name='google_login'),
-    path('microsoft-login/', microsoft_login, name='microsoft_login'),
+    path('microsoft-login/', azure_login_verify, name='azure_login_verify'),
+    path('current-user/', current_user, name='current_user'),
+
 
     path('', include(router.urls)),
     

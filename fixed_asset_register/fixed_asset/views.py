@@ -18,7 +18,8 @@ from django.contrib.auth.models import User
 import jwt
 from django.http import JsonResponse
 import requests
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view,  permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -139,6 +140,19 @@ class DepreciationCalculationAPI(APIView):
 
     def get(self, request):
         return Response({"detail": "Use POST to calculate depreciation"}, status=200)
+    
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_user(request):
+    user = request.user
+
+    return Response({
+        "name": user.name,
+        "email": user.email,
+        "role": user.role.role_name,  
+        "department": user.department.dept_name
+    })
 
 class FixedAssetFullDetailAPI(APIView):
     def get(self, request, pk):
@@ -484,77 +498,126 @@ def google_login(request):
         "refresh": str(refresh),
     }, status=200)
 
-TENANT_ID = "6424c4c1-87db-4bee-b669-52a240a51619"
-CLIENT_ID = "c40df40a-9e4b-4280-89ea-b77effba21b3"
+# TENANT_ID = "6424c4c1-87db-4bee-b669-52a240a51619"
+# CLIENT_ID = "c40df40a-9e4b-4280-89ea-b77effba21b3"
+
+# @csrf_exempt
+# def microsoft_login(request):
+#     if request.method == "POST":
+
+#         body = json.loads(request.body)
+#         token = body.get("token")
+
+#         if not token:
+#             return JsonResponse({"status": "error", "message": "No token provided"}, status=400)
+
+#         try:
+
+#             # Microsoft public keys
+#             jwks_url = f"https://login.microsoftonline.com/{TENANT_ID}/discovery/v2.0/keys"
+#             jwks = requests.get(jwks_url).json()
+
+#             unverified_header = jwt.get_unverified_header(token)
+
+#             rsa_key = {}
+#             for key in jwks["keys"]:
+#                 if key["kid"] == unverified_header["kid"]:
+#                     rsa_key = {
+#                         "kty": key["kty"],
+#                         "kid": key["kid"],
+#                         "use": key["use"],
+#                         "n": key["n"],
+#                         "e": key["e"],
+#                     }
+
+#             if not rsa_key:
+#                 return JsonResponse({"status": "error", "message": "Public key not found"}, status=400)
+
+#             decoded = jwt.decode(
+#                 token,
+#                 jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(rsa_key)),
+#                 algorithms=["RS256"],
+#                 audience=CLIENT_ID,
+#                 issuer=f"https://login.microsoftonline.com/{TENANT_ID}/v2.0"
+#             )
+
+#             email = decoded.get("preferred_username") or decoded.get("email")
+#             name = decoded.get("name", "")
+
+#             if not email:
+#                 return JsonResponse({"status": "error", "message": "Email not found"}, status=400)
+
+#             user, created = Users.objects.get_or_create(
+#                 email=email,
+#                 defaults={
+#                     "name": name,
+#                     "auth_provider": "microsoft",
+#                     "department_id": 1,
+#                     "role_id": 1
+#                 }
+#             )
+
+#             return JsonResponse({
+#                 "status": "success",
+#                 "user_id": user.id,
+#                 "email": user.email,
+#                 "name": user.name,
+#                 "created": created
+#             })
+
+#         except Exception as e:
+#             return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+#     return JsonResponse({"status": "error", "message": "Method not allowed"}, status=405)
 
 @csrf_exempt
-def microsoft_login(request):
-    if request.method == "POST":
+def azure_login_verify(request):
+   
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST method is allowed'}, status=405)
 
-        body = json.loads(request.body)
-        token = body.get("token")
+    try:
+        data = json.loads(request.body)
+        access_token = data.get('access_token')
 
-        if not token:
-            return JsonResponse({"status": "error", "message": "No token provided"}, status=400)
+        if not access_token:
+            return JsonResponse({'error': 'Access token is required'}, status=400)
 
-        try:
+        
+        graph_response = requests.get(
+            'https://graph.microsoft.com/v1.0/me',
+            headers={'Authorization': f'Bearer {access_token}'}
+        )
+        
+        if graph_response.status_code == 200:
+            ms_user = graph_response.json()
+            user_email = ms_user.get('mail') or ms_user.get('userPrincipalName')
+            user_name = ms_user.get('displayName')
 
-            # Microsoft public keys
-            jwks_url = f"https://login.microsoftonline.com/{TENANT_ID}/discovery/v2.0/keys"
-            jwks = requests.get(jwks_url).json()
-
-            unverified_header = jwt.get_unverified_header(token)
-
-            rsa_key = {}
-            for key in jwks["keys"]:
-                if key["kid"] == unverified_header["kid"]:
-                    rsa_key = {
-                        "kty": key["kty"],
-                        "kid": key["kid"],
-                        "use": key["use"],
-                        "n": key["n"],
-                        "e": key["e"],
-                    }
-
-            if not rsa_key:
-                return JsonResponse({"status": "error", "message": "Public key not found"}, status=400)
-
-            decoded = jwt.decode(
-                token,
-                jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(rsa_key)),
-                algorithms=["RS256"],
-                audience=CLIENT_ID,
-                issuer=f"https://login.microsoftonline.com/{TENANT_ID}/v2.0"
-            )
-
-            email = decoded.get("preferred_username") or decoded.get("email")
-            name = decoded.get("name", "")
-
-            if not email:
-                return JsonResponse({"status": "error", "message": "Email not found"}, status=400)
-
-            user, created = Users.objects.get_or_create(
-                email=email,
+          
+            user, created = User.objects.get_or_create(
+                email=user_email,
                 defaults={
-                    "name": name,
-                    "auth_provider": "microsoft",
-                    "department_id": 1,
-                    "role_id": 1
+                    'username': user_email,
+                    'first_name': user_name,
+                    'auth_provider': 'microsoft',
+                    'department_id': 1, 
+                    'role_id': 1        
                 }
             )
 
             return JsonResponse({
-                "status": "success",
-                "user_id": user.id,
-                "email": user.email,
-                "name": user.name,
-                "created": created
+                'id': user.id,
+                'email': user.email,
+                'status': 'success'
             })
+        else:
+            return JsonResponse({'error': 'Invalid Microsoft Token'}, status=401)
 
-        except Exception as e:
-            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
-    return JsonResponse({"status": "error", "message": "Method not allowed"}, status=405)
+    
 class AssetBookViewSet(viewsets.ModelViewSet):
     queryset = AssetBook.objects.all()
     serializer_class = AssetBookSerializer

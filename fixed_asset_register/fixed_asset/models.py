@@ -971,7 +971,7 @@ class LeaseFinancial(models.Model):
     lease_term = models.IntegerField()
     lease_period = models.CharField(max_length=10, choices=PERIOD_CHOICES)
     discount_rate = models.FloatField() 
-    # extensions = models.BooleanField(default=False)
+    extensions = models.BooleanField(default=False)
     payment_frequency = models.DecimalField(max_digits=20, decimal_places=2)
     payment_period = models.CharField(max_length=10, choices=PAYMENT_PERIOD_CHOICES)
     computation = models.CharField(max_length=20, choices=COMPUTATION_CHOICES)
