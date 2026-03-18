@@ -456,7 +456,8 @@ def forgot_password(request):
 
         token_obj = PasswordResetToken.objects.create(user=user)
 
-        reset_link = f"http://localhost:57300/#/reset-password?token={token_obj.token}"
+       # reset_link = f"http://localhost:57300/#/reset-password?token={token_obj.token}"https://gentle-moss-03b9b8b0f.4.azurestaticapps.net
+        reset_link = f"https://gentle-moss-03b9b8b0f.4.azurestaticapps.net/#/reset-password?token={token_obj.token}"
 
         send_mail(
             'Reset Your Password',
