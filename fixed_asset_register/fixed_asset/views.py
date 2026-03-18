@@ -16,14 +16,19 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 from django.contrib.auth.models import User
 import jwt
-from django.http import JsonResponse
 import requests
-from rest_framework.decorators import api_view,  permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
+from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.http import JsonResponse
 import requests as http_requests
+from django.core.mail import send_mail
+from .models import PasswordResetToken
+from .serializers import ForgotPasswordSerializer
+from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from .services.depreciation import (
     get_total_units,
@@ -436,15 +441,75 @@ class LoginView(APIView):
         except Users.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         
-  
+#  forgot password 
+@api_view(['POST'])
+def forgot_password(request):
+    serializer = ForgotPasswordSerializer(data=request.data)
+
+    if serializer.is_valid():
+        email = serializer.validated_data['email']
+
+        try:
+            user = Users.objects.get(email=email)
+        except Users.DoesNotExist:
+            return Response({"message": "If email exists, reset link sent"})
+
+        token_obj = PasswordResetToken.objects.create(user=user)
+
+        reset_link = f"http://localhost:57300/#/reset-password?token={token_obj.token}"
+
+        send_mail(
+            'Reset Your Password',
+            f'Click this link: {reset_link}',
+            settings.EMAIL_HOST_USER,
+            [email],
+        )
+
+        return Response({"message": "Reset link sent to your email"})
+
+    return Response(serializer.errors)
+
+@api_view(['POST'])
+def verify_token(request):
+    token = request.data.get('token')
+
+    try:
+        token_obj = PasswordResetToken.objects.get(token=token)
+    except PasswordResetToken.DoesNotExist:
+        return Response({"error": "Invalid token"}, status=400)
+
+    if token_obj.is_expired():
+        return Response({"error": "Token expired"}, status=400)
+
+    return Response({"message": "Token valid"})
+
+@api_view(['POST'])
+def reset_password(request):
+    serializer = ResetPasswordSerializer(data=request.data)
+
+    if serializer.is_valid():
+        token = serializer.validated_data['token']
+        new_password = serializer.validated_data['new_password']
+
+        try:
+            token_obj = PasswordResetToken.objects.get(token=token)
+        except PasswordResetToken.DoesNotExist:
+            return Response({"error": "Invalid token"}, status=400)
+
+        if token_obj.is_expired():
+            return Response({"error": "Token expired"}, status=400)
+
+        user = token_obj.user
+        user.password_hash = make_password(new_password)
+        user.save()
+
+        token_obj.delete()
+
+        return Response({"message": "Password reset successful"})
+
+    return Response(serializer.errors)
 
 
-import requests
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-from django.contrib.auth import get_user_model
-from rest_framework_simplejwt.tokens import RefreshToken
 
 User = get_user_model()
 
@@ -498,77 +563,6 @@ def google_login(request):
         "refresh": str(refresh),
     }, status=200)
 
-# TENANT_ID = "6424c4c1-87db-4bee-b669-52a240a51619"
-# CLIENT_ID = "c40df40a-9e4b-4280-89ea-b77effba21b3"
-
-# @csrf_exempt
-# def microsoft_login(request):
-#     if request.method == "POST":
-
-#         body = json.loads(request.body)
-#         token = body.get("token")
-
-#         if not token:
-#             return JsonResponse({"status": "error", "message": "No token provided"}, status=400)
-
-#         try:
-
-#             # Microsoft public keys
-#             jwks_url = f"https://login.microsoftonline.com/{TENANT_ID}/discovery/v2.0/keys"
-#             jwks = requests.get(jwks_url).json()
-
-#             unverified_header = jwt.get_unverified_header(token)
-
-#             rsa_key = {}
-#             for key in jwks["keys"]:
-#                 if key["kid"] == unverified_header["kid"]:
-#                     rsa_key = {
-#                         "kty": key["kty"],
-#                         "kid": key["kid"],
-#                         "use": key["use"],
-#                         "n": key["n"],
-#                         "e": key["e"],
-#                     }
-
-#             if not rsa_key:
-#                 return JsonResponse({"status": "error", "message": "Public key not found"}, status=400)
-
-#             decoded = jwt.decode(
-#                 token,
-#                 jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(rsa_key)),
-#                 algorithms=["RS256"],
-#                 audience=CLIENT_ID,
-#                 issuer=f"https://login.microsoftonline.com/{TENANT_ID}/v2.0"
-#             )
-
-#             email = decoded.get("preferred_username") or decoded.get("email")
-#             name = decoded.get("name", "")
-
-#             if not email:
-#                 return JsonResponse({"status": "error", "message": "Email not found"}, status=400)
-
-#             user, created = Users.objects.get_or_create(
-#                 email=email,
-#                 defaults={
-#                     "name": name,
-#                     "auth_provider": "microsoft",
-#                     "department_id": 1,
-#                     "role_id": 1
-#                 }
-#             )
-
-#             return JsonResponse({
-#                 "status": "success",
-#                 "user_id": user.id,
-#                 "email": user.email,
-#                 "name": user.name,
-#                 "created": created
-#             })
-
-#         except Exception as e:
-#             return JsonResponse({"status": "error", "message": str(e)}, status=500)
-
-#     return JsonResponse({"status": "error", "message": "Method not allowed"}, status=405)
 
 @csrf_exempt
 def azure_login_verify(request):

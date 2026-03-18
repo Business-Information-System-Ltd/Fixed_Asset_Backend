@@ -63,6 +63,9 @@ urlpatterns = [
     path('google-login/', google_login, name='google_login'),
     path('microsoft-login/', azure_login_verify, name='azure_login_verify'),
     path('current-user/', current_user, name='current_user'),
+    path('forgot-password/', forgot_password),
+    path('verify-token/', verify_token),
+    path('reset-password/', reset_password),
 
 
     path('', include(router.urls)),

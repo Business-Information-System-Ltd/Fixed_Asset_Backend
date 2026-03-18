@@ -238,6 +238,12 @@ class UserSignupSerializer(serializers.ModelSerializer):
             validated_data['password_hash'] = make_password(validated_data['password_hash'])
         return super().create(validated_data)
     
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class ResetPasswordSerializer(serializers.Serializer):
+    token = serializers.UUIDField()
+    new_password = serializers.CharField(min_length=6)
 
 class AssetBookSerializer(serializers.ModelSerializer):
     class Meta:

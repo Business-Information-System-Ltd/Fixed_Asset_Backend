@@ -3,6 +3,10 @@ from django.core.exceptions import ValidationError
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
+import random
+import uuid
+from datetime import timedelta
+from django.utils.timezone import now
 
 
 class Company(models.Model):
@@ -217,7 +221,7 @@ class FixedAssetRegister(models.Model):
     wip = models.ForeignKey(WorkInProgress, on_delete=models.SET_NULL, null=True, blank=True)
     gl_allocation = models.ForeignKey(GLAllocation, on_delete=models.SET_NULL, null=True, blank=True)
     fixed_asset_code = models.CharField(max_length=255)
-    fixed_asset_account = models.CharField(max_length=255)
+    fixed_asset_account = models.CharField(max_length=255, blank=True)
     acquisition_date = models.DateField()
     source_type = models.CharField(max_length=20, choices=SOURCE_TYPE)
     asset_status = models.CharField(max_length=30, choices=ASSET_STATUS)
@@ -227,7 +231,7 @@ class FixedAssetRegister(models.Model):
     asset_type = models.CharField(max_length=30, choices=ASSET_TYPE)
     description = models.CharField(max_length=500, blank=True, null=True)
     useful_life = models.IntegerField()
-    period = models.CharField(max_length=30, choices=PERIOD)
+    period = models.CharField(max_length=30, choices=PERIOD, blank=True)
     capitalization_date = models.DateTimeField(null=False, blank=False)
     home_currency = models.CharField(max_length=3, default='MMK')
     transaction_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE)
@@ -235,18 +239,18 @@ class FixedAssetRegister(models.Model):
     acquisition_cost = models.FloatField()
     home_acquisition_cost = models.FloatField()
     residual_value = models.FloatField()
-    residual_currency = models.CharField(max_length=3,  choices=CURRENCY_TYPE)
+    residual_currency = models.CharField(max_length=3,  choices=CURRENCY_TYPE, blank=True)
     transportation_fee = models.FloatField()
-    transportation_currency = models.CharField(max_length=3,  choices=CURRENCY_TYPE)
+    transportation_currency = models.CharField(max_length=3,  choices=CURRENCY_TYPE, blank=True)
     tax = models.FloatField()
-    tax_fee_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE)
+    tax_fee_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE, blank=True)
     other_fee = models.FloatField()
-    other_fee_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE)
+    other_fee_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE, blank=True)
     total_amount = models.FloatField()
-    total_amount_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE)
+    total_amount_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE, blank=True)
     computation = models.CharField(max_length=30, choices=COMPUTATION)
     addition_amount = models.FloatField()
-    additional_amount_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE)
+    additional_amount_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE,blank=True)
     depreciation_method = models.CharField(max_length=30, choices=Depreciation_METHOD)
     current_nbv = models.FloatField()
     depreciation_account = models.CharField(max_length=255)
@@ -481,7 +485,7 @@ class Depreciation(models.Model):
     method = models.CharField(max_length=100)
     computation = models.CharField(max_length=100)
     book_value = models.FloatField()
-    journal = models.CharField(max_length=255)
+    journal = models.CharField(max_length=255, blank=True)
     depreciation_rate = models.FloatField()
 
     class Meta:
@@ -513,7 +517,7 @@ class AssetPolicy(models.Model):
     department = models.ForeignKey(Department, on_delete=models.CASCADE)
     depreciation = models.ForeignKey(Depreciation, on_delete=models.CASCADE, db_column='depreciation_id')
     useful_life = models.IntegerField()
-    period = models.CharField(max_length=5, choices=PERIOD)
+    period = models.CharField(max_length=5, choices=PERIOD,blank=True)
     status = models.CharField(max_length=20)
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
@@ -678,6 +682,22 @@ class Users(models.Model):
     class Meta:
         db_table = 'users'
 
+class PasswordResetToken(models.Model):
+    user = models.ForeignKey(Users, on_delete=models.CASCADE)
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        db_table = 'password_reset_token'
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = now() + timedelta(minutes=15)
+        super().save(*args, **kwargs)
+
+    def is_expired(self):
+        return now() > self.expires_at
 
 class AssetBook(models.Model):
     book_id = models.AutoField(primary_key=True)
