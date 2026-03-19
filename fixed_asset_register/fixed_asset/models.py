@@ -917,7 +917,7 @@ class LeaseContract(models.Model):
     expiry_date = models.DateField()
     extension_option = models.BooleanField(null=True, blank=True, default='False')
     extension_years = models.IntegerField(blank=True)
-    termination_certain_date = models.DateField()
+    termination_certain_date = models.DateField(blank=True,)
 
 
     status = models.CharField(
