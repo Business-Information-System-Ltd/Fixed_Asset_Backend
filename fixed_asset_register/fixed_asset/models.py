@@ -905,6 +905,12 @@ class LeaseContract(models.Model):
         ('Amendment', 'Amendment'),
     ]
 
+    EXTENSION_OPTIONS = [
+        ('Yes', 'Yes'),
+        ('No', 'No'),
+    ]
+    
+
     code = models.CharField(max_length=50, unique=True)
     lease_type = models.CharField(max_length=100)
     description = models.TextField(null=True, blank=True)
@@ -915,7 +921,12 @@ class LeaseContract(models.Model):
     location = models.CharField(max_length=255, blank=True)
     commencement_date = models.DateField()
     expiry_date = models.DateField()
-    extension_option = models.BooleanField(null=True, blank=True, default='False')
+    extension_option = models.CharField(
+        max_length=3, 
+        choices=EXTENSION_OPTIONS,
+        null=True, 
+        blank=True
+    )
     extension_years = models.IntegerField(blank=True)
     termination_certain_date = models.DateField(blank=True,)
 
